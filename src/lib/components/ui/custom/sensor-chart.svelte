@@ -6,11 +6,15 @@
 	import Maximize2Icon from '@lucide/svelte/icons/maximize-2';
 
 	const CHANNELS = [
-		{ key: 'ROP', color: '#22d3ee', label: 'Rate of Penetration' },
-		{ key: 'RPM', color: '#facc15', label: 'Rotary Speed' },
-		{ key: 'SPPA', color: '#f97316', label: 'Standpipe Pressure' },
-		{ key: 'WOB', color: '#a78bfa', label: 'Weight on Bit' },
-		{ key: 'HKLD', color: '#34d399', label: 'Hookload' }
+		{ key: 'ROP', color: '#22d3ee', label: 'Rate of Penetration (m/h)' },
+		{ key: 'RPM', color: '#facc15', label: 'Rotary Speed (rpm)' },
+		{ key: 'SPPA', color: '#f97316', label: 'Standpipe Pressure (kPa)' },
+		{ key: 'WOB', color: '#a78bfa', label: 'Weight on Bit (kkgf)' },
+		{ key: 'HKLD', color: '#34d399', label: 'Hookload (kkgf)' },
+		{ key: 'FLWI', color: '#f472b6', label: 'Flow In (L/min)' },
+		{ key: 'BPOS', color: '#818cf8', label: 'Block Position (m)' },
+		{ key: 'DBTM', color: '#fb923c', label: 'Bit Depth (m)' },
+		{ key: 'HDTH', color: '#94a3b8', label: 'Hole Depth (m)' }
 	];
 
 	let {
