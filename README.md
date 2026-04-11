@@ -11,10 +11,10 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 - **14 wells** from the Volve North Sea oil field — select any well to explore its sensor data
 - **Sensor chart** — 5 drilling channels (ROP, RPM, Pressure, Weight on Bit, Hookload) with playback
 - **Playback controls** — play, pause, reset with progress bar
-- **Machine State classification** — Newton classifies each 100-sample window as drilling or not_drilling
+- **Machine State classification** — Newton classifies each 25-sample window as drilling or not_drilling
 - **Classification bands** — color-coded overlay on the sensor chart (cyan = drilling, orange = not drilling)
 - **Classification log** — scrolling list of predictions with drilling/not-drilling counts
-- **N-shot learning** — 2,000 labeled examples per class uploaded to Newton for KNN classification
+- **N-shot learning** — 500 labeled examples per class uploaded to Newton for KNN classification
 - **SSE streaming** — results arrive in real-time as windows are processed
 
 ## Stack
@@ -65,9 +65,9 @@ Open `http://localhost:5173`, select a well, click **Start Analysis**, then pres
 ## How It Works
 
 1. Select a well — 5,000 downsampled rows load from the pre-processed CSV
-2. **Start Analysis** uploads n-shot CSV files (2,000 drilling + 2,000 not_drilling examples), creates a Machine State Lens session, and connects SSE
+2. **Start Analysis** uploads n-shot CSV files (500 drilling + 500 not_drilling examples), creates a Machine State Lens session, and connects SSE
 3. Press **Play** — data plays back at accelerated speed, advancing the chart playhead
-4. As the playhead passes each 100-sample window boundary, the window is streamed to Newton
+4. As the playhead passes each 25-sample window boundary, the window is streamed to Newton
 5. Newton's Machine State Lens computes OmegaEncoder embeddings, runs KNN against n-shot examples, and returns a classification via SSE
 6. Results appear as colored bands on the sensor chart and entries in the classification log
 
