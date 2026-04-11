@@ -34,19 +34,8 @@ export async function endSession(sessionId) {
 	});
 }
 
-export async function fetchWellData(wellFile) {
-	const res = await fetch(`/data/wells/${wellFile}`);
+export async function fetchWellChunk(wellFile, offset = 0, limit = 5000) {
+	const res = await fetch(`/api/wells/data?well=${encodeURIComponent(wellFile)}&offset=${offset}&limit=${limit}`);
 	if (!res.ok) throw new Error('Failed to fetch well data');
-	const text = await res.text();
-
-	const lines = text.trim().split('\n');
-	const headers = lines[0].split(',');
-	return lines.slice(1).map((line) => {
-		const values = line.split(',');
-		const row = {};
-		headers.forEach((h, i) => {
-			row[h.trim()] = values[i]?.trim() ?? '';
-		});
-		return row;
-	});
+	return res.json();
 }

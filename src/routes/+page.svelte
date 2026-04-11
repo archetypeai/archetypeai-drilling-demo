@@ -7,14 +7,19 @@
 	import ClassificationLog from '$lib/components/ui/custom/classification-log.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
-	import { fetchWells, fetchWellData, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
+	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
 	const WINDOW_SIZE = 100;
 	const STEP_SIZE = 100;
 
+	const CHUNK_SIZE = 5000;
+
 	let wells = $state([]);
 	let selectedWell = $state(null);
 	let wellData = $state([]);
+	let wellTotal = $state(0);
+	let loadedOffset = $state(0);
+	let loadingChunk = $state(false);
 	let playheadIndex = $state(0);
 	let playing = $state(false);
 	let playInterval = $state(null);
@@ -44,13 +49,33 @@
 		classifications = [];
 		streamCounter = 0;
 		playing = false;
+		loadedOffset = 0;
+		wellData = [];
+		wellTotal = 0;
 		if (playInterval) clearInterval(playInterval);
 
+		await loadNextChunk(well.id, 0);
+	}
+
+	async function loadNextChunk(wellFile, offset) {
+		if (loadingChunk) return;
+		loadingChunk = true;
 		try {
-			wellData = await fetchWellData(well.id);
+			const data = await fetchWellChunk(wellFile || selectedWell?.id, offset, CHUNK_SIZE);
+			wellData = [...wellData, ...data.rows];
+			wellTotal = data.total;
+			loadedOffset = offset + data.rows.length;
 		} catch (err) {
-			console.error('Failed to load well data:', err);
-			wellData = [];
+			console.error('Failed to load chunk:', err);
+		} finally {
+			loadingChunk = false;
+		}
+	}
+
+	function maybeLoadMore() {
+		// Load next chunk when playhead is within 1000 rows of loaded data
+		if (selectedWell && loadedOffset < wellTotal && playheadIndex > loadedOffset - 1000) {
+			loadNextChunk(selectedWell.id, loadedOffset);
 		}
 	}
 
@@ -140,13 +165,17 @@
 				playheadIndex = Math.min(playheadIndex + 20, wellData.length - 1);
 			}
 
+			// Load more data when approaching the end of loaded rows
+			maybeLoadMore();
+
 			// Stream a window when playhead passes the next window boundary
 			const nextWindowStart = streamCounter * STEP_SIZE;
 			if (sessionId && playheadIndex >= nextWindowStart + WINDOW_SIZE) {
 				streamNextWindow();
 			}
 
-			if (playheadIndex >= wellData.length - 1) {
+			// Only stop if we've reached the end of ALL data (not just loaded data)
+			if (playheadIndex >= wellData.length - 1 && loadedOffset >= wellTotal) {
 				playing = false;
 				clearInterval(playInterval);
 			}
@@ -227,7 +256,7 @@
 		<PlaybackControls
 			{playing}
 			current={playheadIndex}
-			total={wellData.length}
+			total={wellTotal}
 			wellName={selectedWell?.shortName ?? ''}
 			onplay={handlePlay}
 			onpause={handlePause}
