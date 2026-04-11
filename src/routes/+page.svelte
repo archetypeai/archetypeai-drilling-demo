@@ -9,8 +9,8 @@
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
-	const WINDOW_SIZE = 100;
-	const STEP_SIZE = 100;
+	const WINDOW_SIZE = 25;
+	const STEP_SIZE = 25;
 
 	const CHUNK_SIZE = 5000;
 
