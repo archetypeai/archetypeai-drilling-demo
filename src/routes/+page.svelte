@@ -3,7 +3,7 @@
 	import { Button } from '$lib/components/ui/primitives/button/index.js';
 	import StatusBadge from '$lib/components/ui/patterns/status-badge/status-badge.svelte';
 	import WellSelector from '$lib/components/ui/custom/well-selector.svelte';
-	import SensorChart from '$lib/components/ui/custom/sensor-chart.svelte';
+	import RigDashboard from '$lib/components/ui/custom/rig-dashboard.svelte';
 	import ClassificationLog from '$lib/components/ui/custom/classification-log.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
@@ -235,12 +235,13 @@
 		/>
 	</div>
 
-	<main class="grid grid-cols-2 grid-rows-1 gap-4 overflow-hidden p-4">
-		<SensorChart
+	<main class="grid grid-cols-[2fr_1fr] grid-rows-1 gap-4 overflow-hidden p-4">
+		<RigDashboard
 			rows={wellData}
 			{playheadIndex}
 			{classifications}
-			onexpand={() => toggleExpand('sensor')}
+			currentState={classifications.length > 0 ? classifications[classifications.length - 1].label : null}
+			onexpand={() => toggleExpand('rig')}
 			class="max-h-full overflow-hidden"
 		/>
 
@@ -252,14 +253,20 @@
 {#if expanded}
 	<div class="bg-background fixed inset-0 z-50 flex flex-col overflow-hidden">
 		<div class="border-border flex items-center justify-between border-b px-4 py-2">
-			<span class="text-foreground font-mono text-sm uppercase tracking-wider">Sensor Data</span>
+			<span class="text-foreground font-mono text-sm uppercase tracking-wider">Drilling Rig</span>
 			<Button variant="outline" size="sm" onclick={() => (expanded = null)}>
 				<MinimizeIcon class="size-3.5" />
 				Close
 			</Button>
 		</div>
 		<div class="min-h-0 flex-1 p-4">
-			<SensorChart rows={wellData} {playheadIndex} {classifications} class="h-full" />
+			<RigDashboard
+				rows={wellData}
+				{playheadIndex}
+				{classifications}
+				currentState={classifications.length > 0 ? classifications[classifications.length - 1].label : null}
+				class="h-full"
+			/>
 		</div>
 	</div>
 {/if}
