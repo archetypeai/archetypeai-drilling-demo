@@ -21,6 +21,9 @@
 	class={cn('flex max-h-full flex-col gap-3 overflow-hidden', className)}
 	{...restProps}
 >
+	<p class="text-muted-foreground text-[10px]">
+		Newton's Machine State Lens classifies each window using n-shot examples (2,000 drilling + 2,000 not-drilling) with KNN over OmegaEncoder embeddings.
+	</p>
 	{#if stats.total > 0}
 		<div class="flex items-center gap-4 font-mono text-xs">
 			<span class="text-muted-foreground">

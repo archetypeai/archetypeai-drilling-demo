@@ -212,11 +212,18 @@
 		</div>
 	</Menubar>
 
-	<div class="border-border border-b px-4 py-2">
+	<div class="border-border flex items-center gap-6 border-b px-4 py-2">
 		<WellSelector {wells} bind:selected={selectedWell} onselect={handleWellSelect} />
+		{#if !sessionId}
+			<div class="text-muted-foreground hidden items-center gap-4 text-xs lg:flex">
+				<span><span class="bg-muted text-foreground mr-1 inline-flex size-5 items-center justify-center rounded-full font-mono text-[10px]">1</span> Select a well</span>
+				<span><span class="bg-muted text-foreground mr-1 inline-flex size-5 items-center justify-center rounded-full font-mono text-[10px]">2</span> Start Analysis</span>
+				<span><span class="bg-muted text-foreground mr-1 inline-flex size-5 items-center justify-center rounded-full font-mono text-[10px]">3</span> Press Play</span>
+			</div>
+		{/if}
 	</div>
 
-	<div class="border-border border-b px-4 py-2">
+	<div class="border-border flex items-center gap-4 border-b px-4 py-2">
 		<PlaybackControls
 			{playing}
 			current={playheadIndex}
