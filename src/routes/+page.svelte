@@ -29,6 +29,7 @@
 	let sseUrl = $state(null);
 	let apiKey = $state(null);
 	let sessionStatus = $state('idle');
+	let setupStep = $state('');
 	let classifications = $state([]);
 	let streamCounter = $state(0);
 	let expanded = $state(null);
@@ -81,21 +82,32 @@
 	}
 
 	async function handleStart() {
-		if (sessionId) return;
+		// Reuse existing session if available
+		if (sessionId) {
+			// Just reset playback state for the new well
+			classifications = [];
+			streamCounter = 0;
+			return;
+		}
+
 		sessionStatus = 'connecting';
+		setupStep = 'Starting...';
 
 		try {
-			const result = await startSession();
+			const result = await startSession((step) => {
+				setupStep = step;
+			});
 			sessionId = result.sessionId;
 			sseUrl = result.sseUrl;
 			apiKey = result.apiKey;
 			sessionStatus = 'active';
+			setupStep = '';
 
-			// Start SSE consumer
 			startSSE();
 		} catch (err) {
 			console.error('Session failed:', err);
 			sessionStatus = 'error';
+			setupStep = '';
 		}
 	}
 
@@ -253,7 +265,7 @@
 			{#if sessionStatus === 'connecting'}
 				<Button variant="default" size="sm" disabled>
 					<SpinnerIcon class="size-3.5 animate-spin" />
-					Connecting to Newton...
+					{setupStep || 'Connecting...'}
 				</Button>
 			{:else if !sessionId}
 				<Button variant="default" size="sm" onclick={handleStart} disabled={!selectedWell}>

@@ -4,13 +4,32 @@ export async function fetchWells() {
 	return res.json();
 }
 
-export async function startSession() {
-	const res = await fetch('/api/session', { method: 'POST' });
-	if (!res.ok) {
-		const err = await res.json().catch(() => ({}));
-		throw new Error(err.error || 'Failed to create session');
-	}
-	return res.json();
+export async function startSession(onStep) {
+	return new Promise((resolve, reject) => {
+		const es = new EventSource('/api/session');
+
+		es.onmessage = (event) => {
+			try {
+				const data = JSON.parse(event.data);
+				if (data.type === 'step') {
+					onStep?.(data.step);
+				} else if (data.type === 'done') {
+					es.close();
+					resolve(data);
+				} else if (data.type === 'error') {
+					es.close();
+					reject(new Error(data.error));
+				}
+			} catch {
+				// ignore parse errors
+			}
+		};
+
+		es.onerror = () => {
+			es.close();
+			reject(new Error('Connection to session setup failed'));
+		};
+	});
 }
 
 export async function streamWindowToNewton(sessionId, rows) {

@@ -86,10 +86,17 @@ const STEP_SIZE = 25;
 const DATA_COLUMNS = ['BPOS', 'DBTM', 'FLWI', 'HDTH', 'HKLD', 'ROP', 'RPM', 'SPPA', 'WOB'];
 
 export async function createDrillingSession() {
+	return createDrillingSessionWithProgress(() => {});
+}
+
+export async function createDrillingSessionWithProgress(onStep) {
+	onStep('Cleaning stale lenses...');
 	await cleanStaleLenses();
 
-	// Upload n-shot example files
+	onStep('Uploading drilling examples (2,000 rows)...');
 	const drillingUpload = await uploadFile(resolve('static/data/volve_drilling.csv'));
+
+	onStep('Uploading not-drilling examples (2,000 rows)...');
 	const notDrillingUpload = await uploadFile(resolve('static/data/volve_not_drilling.csv'));
 
 	const lensConfig = {
@@ -125,10 +132,14 @@ export async function createDrillingSession() {
 		}
 	};
 
+	onStep('Registering Machine State Lens...');
 	const lens = await apiPost('/lens/register', { lens_config: lensConfig }, 30000);
+
+	onStep('Creating session...');
 	const session = await apiPost('/lens/sessions/create', { lens_id: lens.lens_id });
 	const sessionId = session.session_id;
 
+	onStep('Waiting for session to be ready (processing n-shot examples)...');
 	const ready = await waitForSession(sessionId);
 	if (!ready) throw new Error('Drilling session failed to start');
 
