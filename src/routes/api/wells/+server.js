@@ -2,8 +2,7 @@ import { json } from '@sveltejs/kit';
 import { readdirSync } from 'fs';
 import { resolve } from 'path';
 
-const DATA_DIR =
-	process.env.VOLVE_DATA_DIR || resolve('static/data/wells');
+const DATA_DIR = resolve('static/data/wells');
 
 export async function GET() {
 	try {

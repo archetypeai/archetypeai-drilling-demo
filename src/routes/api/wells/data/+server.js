@@ -3,9 +3,7 @@ import { createReadStream } from 'fs';
 import { resolve } from 'path';
 import { createInterface } from 'readline';
 
-// Full data directory — set VOLVE_DATA_DIR in .env, or falls back to static/data/wells
-const DATA_DIR =
-	process.env.VOLVE_DATA_DIR || resolve('static/data/wells');
+const DATA_DIR = resolve('static/data/wells');
 
 // In-memory cache for the currently loaded well (avoids re-reading on every chunk request)
 let cachedWell = null;
