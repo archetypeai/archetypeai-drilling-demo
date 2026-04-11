@@ -10,7 +10,8 @@
 		{ key: 'BPOS', label: 'Block Position', unit: 'm', color: '#818cf8' },
 		{ key: 'DBTM', label: 'Bit Depth', unit: 'm', color: '#fb923c' },
 		{ key: 'HDTH', label: 'Hole Depth', unit: 'm', color: '#94a3b8' },
-		{ key: 'FLWI', label: 'Flow In', unit: 'L/min', color: '#f472b6' }
+		{ key: 'FLWI', label: 'Flow In', unit: 'L/min', color: '#f472b6' },
+		{ key: 'ACTC', label: 'Activity Code', unit: '', color: '#e879f9', isACTC: true }
 	];
 
 	const RIGHT_CHANNELS = [
@@ -20,6 +21,12 @@
 		{ key: 'WOB', label: 'Weight on Bit', unit: 'kkgf', color: '#a78bfa' },
 		{ key: 'HKLD', label: 'Hookload', unit: 'kkgf', color: '#34d399' }
 	];
+
+	const ACTC_LABELS = {
+		'1': 'Drilling', '2': 'Reaming', '3': 'Off Bottom',
+		'4': 'In Slips', '5': 'Unknown', '8': 'Trip In Slips',
+		'9': 'Shut In', '20': 'Tripping', '-1': 'N/A', '': '--'
+	};
 
 	let {
 		rows = [],
@@ -33,9 +40,11 @@
 
 	let displayRows = $derived(rows.slice(0, playheadIndex + 1));
 
-	function currentValue(key) {
+	function currentValue(key, isACTC = false) {
 		if (!displayRows.length) return '--';
-		const val = parseFloat(displayRows[displayRows.length - 1]?.[key]);
+		const raw = displayRows[displayRows.length - 1]?.[key] ?? '';
+		if (isACTC) return ACTC_LABELS[raw] ?? raw ?? '--';
+		const val = parseFloat(raw);
 		return isNaN(val) ? '--' : val.toFixed(1);
 	}
 
@@ -99,7 +108,7 @@
 					<div class="flex items-baseline justify-between">
 						<span class="text-muted-foreground text-[10px]">{ch.label}</span>
 						<span class="font-mono text-sm" style:color={ch.color}>
-							{currentValue(ch.key)} <span class="text-muted-foreground text-[9px]">{ch.unit}</span>
+							{currentValue(ch.key, ch.isACTC)} {#if ch.unit}<span class="text-muted-foreground text-[9px]">{ch.unit}</span>{/if}
 						</span>
 					</div>
 					<svg class="mt-1 h-6 w-full" viewBox="0 0 120 24" preserveAspectRatio="none">

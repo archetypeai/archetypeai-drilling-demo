@@ -11,6 +11,7 @@
 		current = 0,
 		total = 0,
 		wellName = '',
+		timestamp = null,
 		onplay,
 		onpause,
 		onreset,
@@ -19,6 +20,18 @@
 	} = $props();
 
 	let progress = $derived(total > 0 ? ((current / total) * 100).toFixed(1) : '0');
+
+	let formattedTime = $derived.by(() => {
+		if (!timestamp) return '';
+		const ts = parseInt(timestamp);
+		if (isNaN(ts)) return '';
+		const d = new Date(ts * 1000);
+		return d.toLocaleString('en-US', {
+			year: 'numeric', month: 'short', day: 'numeric',
+			hour: '2-digit', minute: '2-digit', second: '2-digit',
+			hour12: false
+		});
+	});
 </script>
 
 <div class={cn('flex items-center gap-3', className)} {...restProps}>
@@ -43,8 +56,12 @@
 	</div>
 
 	<span class="text-muted-foreground font-mono text-[10px] whitespace-nowrap">
-		{current} / {total}
+		{current.toLocaleString()} / {total.toLocaleString()}
 	</span>
+
+	{#if formattedTime}
+		<Badge variant="outline" class="font-mono text-[10px]">{formattedTime}</Badge>
+	{/if}
 
 	{#if wellName}
 		<Badge variant="outline" class="font-mono text-[10px]">{wellName}</Badge>

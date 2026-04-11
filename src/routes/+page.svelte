@@ -258,6 +258,7 @@
 			current={playheadIndex}
 			total={wellTotal}
 			wellName={selectedWell?.shortName ?? ''}
+			timestamp={wellData[playheadIndex]?.DATE_TIME ?? null}
 			onplay={handlePlay}
 			onpause={handlePause}
 			onreset={handleReset}
