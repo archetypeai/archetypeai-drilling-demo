@@ -110,14 +110,17 @@
 					<span class="text-muted-foreground text-[10px]">{ch.key}</span>
 				</div>
 			{/each}
-			<div class="flex items-center gap-1">
-				<div class="h-2 w-3 rounded-xs bg-[#22d3ee]"></div>
-				<span class="text-muted-foreground text-[10px]">Drilling</span>
-			</div>
-			<div class="flex items-center gap-1">
-				<div class="h-2 w-3 rounded-xs bg-[#f97316]"></div>
-				<span class="text-muted-foreground text-[10px]">Not Drilling</span>
-			</div>
+			{#if classifications.length > 0}
+				<span class="text-muted-foreground text-[10px]">|</span>
+				<div class="flex items-center gap-1">
+					<div class="h-2 w-3 rounded-xs bg-[#22d3ee]"></div>
+					<span class="text-muted-foreground text-[10px]">Drilling</span>
+				</div>
+				<div class="flex items-center gap-1">
+					<div class="h-2 w-3 rounded-xs bg-[#f97316]"></div>
+					<span class="text-muted-foreground text-[10px]">Not Drilling</span>
+				</div>
+			{/if}
 		</div>
 		{#if onexpand}
 			<div class="ml-auto">
