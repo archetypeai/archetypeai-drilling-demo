@@ -4,6 +4,8 @@ Drilling state classification dashboard powered by [Newton](https://www.archetyp
 
 Plays back real drilling sensor data from 14 wells in the Volve oil field (North Sea, 2007-2016) and uses Newton's Machine State Lens to classify each data window as **drilling** or **not_drilling** in real-time via SSE streaming.
 
+![Newton Drilling Monitor](static/demo.png)
+
 ## Features
 
 - **14 wells** from the Volve North Sea oil field — select any well to explore its sensor data
