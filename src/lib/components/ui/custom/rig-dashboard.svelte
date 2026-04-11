@@ -28,15 +28,24 @@
 		'9': 'Shut In', '20': 'Tripping', '-1': 'N/A', '': '--'
 	};
 
+	const RIG_COLORS = [
+		'#22d3ee', '#facc15', '#f97316', '#a78bfa', '#34d399',
+		'#f472b6', '#818cf8', '#fb923c', '#94a3b8', '#e879f9',
+		'#60a5fa', '#4ade80', '#fbbf24', '#f87171'
+	];
+
 	let {
 		rows = [],
 		playheadIndex = 0,
 		classifications = [],
 		currentState = null,
+		wellIndex = 0,
 		onexpand,
 		class: className,
 		...restProps
 	} = $props();
+
+	let rigColor = $derived(RIG_COLORS[wellIndex % RIG_COLORS.length]);
 
 	let displayRows = $derived(rows.slice(0, playheadIndex + 1));
 
@@ -122,35 +131,35 @@
 		<div class="flex flex-col items-center justify-center">
 			<svg viewBox="0 0 120 200" class="h-full max-h-64 w-auto" preserveAspectRatio="xMidYMid meet">
 				<!-- Derrick tower -->
-				<line x1="60" y1="10" x2="30" y2="140" stroke="var(--color-muted-foreground)" stroke-width="2" />
-				<line x1="60" y1="10" x2="90" y2="140" stroke="var(--color-muted-foreground)" stroke-width="2" />
+				<line x1="60" y1="10" x2="30" y2="140" stroke={rigColor} stroke-width="2" opacity="0.7" />
+				<line x1="60" y1="10" x2="90" y2="140" stroke={rigColor} stroke-width="2" opacity="0.7" />
 				<!-- Cross braces -->
-				<line x1="38" y1="50" x2="82" y2="50" stroke="var(--color-muted-foreground)" stroke-width="1" opacity="0.5" />
-				<line x1="42" y1="80" x2="78" y2="80" stroke="var(--color-muted-foreground)" stroke-width="1" opacity="0.5" />
-				<line x1="46" y1="110" x2="74" y2="110" stroke="var(--color-muted-foreground)" stroke-width="1" opacity="0.5" />
+				<line x1="38" y1="50" x2="82" y2="50" stroke={rigColor} stroke-width="1" opacity="0.3" />
+				<line x1="42" y1="80" x2="78" y2="80" stroke={rigColor} stroke-width="1" opacity="0.3" />
+				<line x1="46" y1="110" x2="74" y2="110" stroke={rigColor} stroke-width="1" opacity="0.3" />
 				<!-- Crown block -->
-				<rect x="50" y="6" width="20" height="10" rx="2" fill="var(--color-muted-foreground)" opacity="0.6" />
+				<rect x="50" y="6" width="20" height="10" rx="2" fill={rigColor} opacity="0.5" />
 				<!-- Traveling block -->
-				<rect x="52" y="30" width="16" height="12" rx="2" fill="var(--color-muted-foreground)" />
+				<rect x="52" y="30" width="16" height="12" rx="2" fill={rigColor} opacity="0.7" />
 				<!-- Drill line -->
-				<line x1="60" y1="16" x2="60" y2="30" stroke="var(--color-muted-foreground)" stroke-width="1.5" />
+				<line x1="60" y1="16" x2="60" y2="30" stroke={rigColor} stroke-width="1.5" opacity="0.6" />
 				<!-- Kelly / drill string -->
-				<rect x="57" y="42" width="6" height="96" rx="1" fill={lastClassification?.label === 'DRILLING' ? '#22d3ee' : lastClassification ? '#f97316' : 'var(--color-muted-foreground)'} opacity="0.7" />
+				<rect x="57" y="42" width="6" height="96" rx="1" fill={lastClassification?.label === 'DRILLING' ? '#22d3ee' : lastClassification ? '#f97316' : rigColor} opacity="0.7" />
 				<!-- Rotary table -->
-				<rect x="35" y="138" width="50" height="8" rx="2" fill="var(--color-muted-foreground)" />
+				<rect x="35" y="138" width="50" height="8" rx="2" fill={rigColor} opacity="0.6" />
 				<!-- Substructure -->
-				<rect x="25" y="146" width="70" height="6" rx="1" fill="var(--color-muted-foreground)" opacity="0.4" />
+				<rect x="25" y="146" width="70" height="6" rx="1" fill={rigColor} opacity="0.3" />
 				<!-- Drill bit -->
-				<polygon points="55,138 65,138 62,145 58,145" fill={lastClassification?.label === 'DRILLING' ? '#22d3ee' : lastClassification ? '#f97316' : 'var(--color-muted-foreground)'} opacity="0.8" />
+				<polygon points="55,138 65,138 62,145 58,145" fill={lastClassification?.label === 'DRILLING' ? '#22d3ee' : lastClassification ? '#f97316' : rigColor} opacity="0.8" />
 				<!-- Ground surface -->
 				<line x1="10" y1="146" x2="110" y2="146" stroke="var(--color-border)" stroke-width="1" />
 				<!-- Wellbore -->
-				<rect x="56" y="146" width="8" height="50" rx="1" fill="var(--color-card)" stroke="var(--color-border)" stroke-width="0.5" />
+				<rect x="56" y="146" width="8" height="50" rx="1" fill="var(--color-card)" stroke={rigColor} stroke-width="0.5" opacity="0.4" />
 				<!-- Mud pit -->
-				<rect x="92" y="130" width="20" height="16" rx="2" fill="var(--color-muted-foreground)" opacity="0.3" />
-				<text x="102" y="141" text-anchor="middle" fill="var(--color-muted-foreground)" font-size="6" font-family="var(--font-mono)">MUD</text>
+				<rect x="92" y="130" width="20" height="16" rx="2" fill={rigColor} opacity="0.2" />
+				<text x="102" y="141" text-anchor="middle" fill={rigColor} font-size="6" font-family="var(--font-mono)" opacity="0.6">MUD</text>
 				<!-- Mud line -->
-				<path d="M92,138 L80,138 L80,148 L56,148" fill="none" stroke="var(--color-muted-foreground)" stroke-width="1" opacity="0.3" stroke-dasharray="3,2" />
+				<path d="M92,138 L80,138 L80,148 L56,148" fill="none" stroke={rigColor} stroke-width="1" opacity="0.2" stroke-dasharray="3,2" />
 				<!-- Status label -->
 				{#if lastClassification}
 					<text x="60" y="190" text-anchor="middle" fill={lastClassification.label === 'DRILLING' ? '#22d3ee' : '#f97316'} font-size="9" font-family="var(--font-mono)" font-weight="bold">

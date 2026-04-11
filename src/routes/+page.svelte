@@ -271,6 +271,7 @@
 			{playheadIndex}
 			{classifications}
 			currentState={classifications.length > 0 ? classifications[classifications.length - 1].label : null}
+			wellIndex={wells.findIndex((w) => w.id === selectedWell?.id)}
 			onexpand={() => toggleExpand('rig')}
 			class="max-h-full overflow-hidden"
 		/>
@@ -295,6 +296,7 @@
 				{playheadIndex}
 				{classifications}
 				currentState={classifications.length > 0 ? classifications[classifications.length - 1].label : null}
+				wellIndex={wells.findIndex((w) => w.id === selectedWell?.id)}
 				class="h-full"
 			/>
 		</div>
