@@ -169,7 +169,14 @@
 	}
 
 	async function preStreamWindows(count) {
-		if (!sessionId || !wellData.length) return;
+		// Wait for well data to be available
+		let waited = 0;
+		while (wellData.length < WINDOW_SIZE && waited < 10000) {
+			await new Promise((r) => setTimeout(r, 200));
+			waited += 200;
+		}
+		if (!sessionId || wellData.length < WINDOW_SIZE) return;
+
 		for (let i = 0; i < count; i++) {
 			await streamNextWindow();
 		}
@@ -209,10 +216,12 @@
 			// Load more data when approaching the end of loaded rows
 			maybeLoadMore();
 
-			// Stream a window when playhead passes the next window boundary
-			const nextWindowStart = streamCounter * STEP_SIZE;
-			if (sessionId && playheadIndex >= nextWindowStart + WINDOW_SIZE) {
-				streamNextWindow();
+			// Stream windows to keep up with playhead
+			if (sessionId) {
+				const nextWindowStart = streamCounter * STEP_SIZE;
+				if (playheadIndex >= nextWindowStart) {
+					streamNextWindow();
+				}
 			}
 
 			// Only stop if we've reached the end of ALL data (not just loaded data)
