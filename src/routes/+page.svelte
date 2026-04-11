@@ -7,6 +7,7 @@
 	import ClassificationLog from '$lib/components/ui/custom/classification-log.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
+	import SpinnerIcon from '@lucide/svelte/icons/loader';
 	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
 	const WINDOW_SIZE = 25;
@@ -249,7 +250,12 @@
 			{#if sessionStatus === 'active'}
 				<StatusBadge label="Newton" percentage={100} initial="N" />
 			{/if}
-			{#if !sessionId}
+			{#if sessionStatus === 'connecting'}
+				<Button variant="default" size="sm" disabled>
+					<SpinnerIcon class="size-3.5 animate-spin" />
+					Connecting to Newton...
+				</Button>
+			{:else if !sessionId}
 				<Button variant="default" size="sm" onclick={handleStart} disabled={!selectedWell}>
 					Start Analysis
 				</Button>
