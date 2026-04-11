@@ -108,4 +108,6 @@ This demo uses the **Machine State Lens** — the third Newton API pattern:
 
 ## Data Attribution
 
-Dataset provided by Equinor under a [modified CC BY 4.0 license](https://www.equinor.com/energy/volve-data-sharing). Free for commercial use, must not be resold, must attribute Equinor.
+The drilling sensor data used in these examples is from the **Equinor Volve Data Village**, released under a modified CC BY 4.0 license. The data may be used for commercial and non-commercial purposes but may not be resold.
+
+> Data provided by Equinor and the former Volve license partners (ExxonMobil Exploration & Production Norway AS and Bayerngas Norge AS). [Terms and Conditions](https://www.equinor.com/energy/volve-data-sharing).
