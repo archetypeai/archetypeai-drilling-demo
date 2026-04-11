@@ -17,9 +17,6 @@
 			}}
 		>
 			{well.shortName}
-			<Badge variant="outline" class="ml-1 px-1 py-0 text-[9px] opacity-60">
-				{well.drillingPct}%
-			</Badge>
 		</Button>
 	{/each}
 </div>
