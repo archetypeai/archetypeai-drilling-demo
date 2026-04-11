@@ -108,19 +108,37 @@
 				const parsed = JSON.parse(event.data);
 
 				if (parsed.type === 'inference.result') {
-					const label = parsed.event_data?.response;
+					const raw = parsed.event_data?.response;
+					let label = '';
+
+					// Extract the label string from various response formats
+					if (typeof raw === 'string') {
+						label = raw;
+					} else if (Array.isArray(raw)) {
+						label = raw[0];
+					} else if (raw && typeof raw === 'object') {
+						// Could be { class_name: 'DRILLING', ... } or similar
+						label = raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
+					}
+
 					if (label) {
 						const windowIdx = classifications.length;
 						classifications = [
 							...classifications,
 							{
 								id: crypto.randomUUID(),
-								label,
+								label: String(label),
 								windowStart: windowIdx * STEP_SIZE,
 								windowEnd: (windowIdx + 1) * STEP_SIZE
 							}
 						];
 					}
+				}
+
+				// Also handle training completion events
+				if (parsed.type === 'session.modify.result') {
+					const cls = parsed.event_data?.query_metadata?.class_name;
+					if (cls) console.log(`[TRAINING] Processed class: ${cls}`);
 				}
 			} catch {
 				// ignore parse errors
