@@ -51,10 +51,15 @@
 
 	function currentValue(key, isACTC = false) {
 		if (!displayRows.length) return '--';
-		const raw = displayRows[displayRows.length - 1]?.[key] ?? '';
-		if (isACTC) return ACTC_LABELS[raw] ?? raw ?? '--';
-		const val = parseFloat(raw);
-		return isNaN(val) ? '--' : val.toFixed(1);
+		// Search backwards for the most recent non-empty value
+		for (let i = displayRows.length - 1; i >= Math.max(0, displayRows.length - 50); i--) {
+			const raw = displayRows[i]?.[key] ?? '';
+			if (raw === '') continue;
+			if (isACTC) return ACTC_LABELS[raw] ?? raw;
+			const val = parseFloat(raw);
+			if (!isNaN(val)) return val.toFixed(1);
+		}
+		return '--';
 	}
 
 	// Build sparkline path for a channel (last 200 points)
