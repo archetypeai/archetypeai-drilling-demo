@@ -104,6 +104,9 @@
 			setupStep = '';
 
 			startSSE();
+
+			// Pre-stream first few windows so results are ready before Play
+			preStreamWindows(5);
 		} catch (err) {
 			console.error('Session failed:', err);
 			sessionStatus = 'error';
@@ -163,6 +166,13 @@
 		};
 
 		sseSource = es;
+	}
+
+	async function preStreamWindows(count) {
+		if (!sessionId || !wellData.length) return;
+		for (let i = 0; i < count; i++) {
+			await streamNextWindow();
+		}
 	}
 
 	async function streamNextWindow() {
