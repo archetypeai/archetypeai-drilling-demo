@@ -4,9 +4,15 @@ export async function fetchWells() {
 	return res.json();
 }
 
-export async function startSession(onStep) {
+export async function startSession(onStep, config = {}) {
+	const params = new URLSearchParams();
+	for (const [key, val] of Object.entries(config)) {
+		if (val !== undefined) params.set(key, String(val));
+	}
+	const url = `/api/session${params.toString() ? '?' + params.toString() : ''}`;
+
 	return new Promise((resolve, reject) => {
-		const es = new EventSource('/api/session');
+		const es = new EventSource(url);
 
 		es.onmessage = (event) => {
 			try {

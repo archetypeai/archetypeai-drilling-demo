@@ -81,26 +81,46 @@ async function waitForSession(sessionId, maxWaitMs = 60000) {
 	return false;
 }
 
-const WINDOW_SIZE = 64;
-const STEP_SIZE = 64;
+const DEFAULT_CONFIG = {
+	windowSize: 64,
+	stepSize: 64,
+	nNeighbors: 5,
+	metric: 'euclidean',
+	weights: 'uniform',
+	algorithm: 'ball_tree',
+	normalizeEmbeddings: false
+};
 const DATA_COLUMNS = ['BPOS', 'DBTM', 'FLWI', 'HDTH', 'HKLD', 'ROP', 'RPM', 'SPPA', 'WOB'];
+
+// Cache uploaded file IDs so we don't re-upload for each session
+let cachedDrillingFileId = null;
+let cachedNotDrillingFileId = null;
 
 export async function createDrillingSession() {
 	return createDrillingSessionWithProgress(() => {});
 }
 
-export async function createDrillingSessionWithProgress(onStep) {
+export async function createDrillingSessionWithProgress(onStep, config = {}) {
+	const cfg = { ...DEFAULT_CONFIG, ...config };
+	const lensName = `${LENS_NAME}-${Date.now()}`;
+
 	onStep('Cleaning stale lenses...');
 	await cleanStaleLenses();
 
-	onStep('Uploading drilling examples (2,000 rows)...');
-	const drillingUpload = await uploadFile(resolve('static/data/volve_drilling.csv'));
+	if (!cachedDrillingFileId || !cachedNotDrillingFileId) {
+		onStep('Uploading drilling examples (2,000 rows)...');
+		const drillingUpload = await uploadFile(resolve('static/data/volve_drilling.csv'));
+		cachedDrillingFileId = drillingUpload.file_id;
 
-	onStep('Uploading not-drilling examples (2,000 rows)...');
-	const notDrillingUpload = await uploadFile(resolve('static/data/volve_not_drilling.csv'));
+		onStep('Uploading not-drilling examples (2,000 rows)...');
+		const notDrillingUpload = await uploadFile(resolve('static/data/volve_not_drilling.csv'));
+		cachedNotDrillingFileId = notDrillingUpload.file_id;
+	} else {
+		onStep('Using cached n-shot files...');
+	}
 
 	const lensConfig = {
-		lens_name: LENS_NAME,
+		lens_name: lensName,
 		lens_config: {
 			model_pipeline: [
 				{ processor_name: 'lens_timeseries_state_processor', processor_config: {} }
@@ -109,23 +129,23 @@ export async function createDrillingSessionWithProgress(onStep) {
 				model_name: 'OmegaEncoder',
 				model_version: 'OmegaEncoder::omega_embeddings_01',
 				normalize_input: true,
-				buffer_size: WINDOW_SIZE,
+				buffer_size: cfg.windowSize,
 				input_n_shot: {
-					DRILLING: drillingUpload.file_id,
-					NOT_DRILLING: notDrillingUpload.file_id
+					DRILLING: cachedDrillingFileId,
+					NOT_DRILLING: cachedNotDrillingFileId
 				},
 				csv_configs: {
 					timestamp_column: 'DATE_TIME',
 					data_columns: DATA_COLUMNS,
-					window_size: WINDOW_SIZE,
-					step_size: STEP_SIZE
+					window_size: cfg.windowSize,
+					step_size: cfg.stepSize
 				},
 				knn_configs: {
-					n_neighbors: 5,
-					metric: 'euclidean',
-					weights: 'uniform',
-					algorithm: 'ball_tree',
-					normalize_embeddings: false
+					n_neighbors: cfg.nNeighbors,
+					metric: cfg.metric,
+					weights: cfg.weights,
+					algorithm: cfg.algorithm,
+					normalize_embeddings: cfg.normalizeEmbeddings
 				}
 			},
 			output_streams: [{ stream_type: 'server_sent_events_writer' }]
@@ -181,4 +201,4 @@ export async function destroySession(sessionId) {
 	await apiPost('/lens/sessions/destroy', { session_id: sessionId });
 }
 
-export { WINDOW_SIZE, STEP_SIZE, DATA_COLUMNS };
+export { DEFAULT_CONFIG, DATA_COLUMNS };

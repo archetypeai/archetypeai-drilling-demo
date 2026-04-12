@@ -6,8 +6,17 @@ import {
 	getApiKey
 } from '$lib/server/newton.js';
 
-export async function GET() {
+export async function GET({ url }) {
 	const encoder = new TextEncoder();
+
+	// Parse config from query params
+	const config = {};
+	if (url.searchParams.has('windowSize')) config.windowSize = parseInt(url.searchParams.get('windowSize'));
+	if (url.searchParams.has('stepSize')) config.stepSize = parseInt(url.searchParams.get('stepSize'));
+	if (url.searchParams.has('nNeighbors')) config.nNeighbors = parseInt(url.searchParams.get('nNeighbors'));
+	if (url.searchParams.has('metric')) config.metric = url.searchParams.get('metric');
+	if (url.searchParams.has('weights')) config.weights = url.searchParams.get('weights');
+	if (url.searchParams.has('algorithm')) config.algorithm = url.searchParams.get('algorithm');
 
 	const stream = new ReadableStream({
 		async start(controller) {
@@ -18,8 +27,7 @@ export async function GET() {
 			}
 
 			try {
-				sendStep('Cleaning stale lenses...');
-				const { sessionId, lensId } = await createDrillingSessionWithProgress(sendStep);
+				const { sessionId, lensId } = await createDrillingSessionWithProgress(sendStep, config);
 
 				controller.enqueue(
 					encoder.encode(
@@ -28,7 +36,8 @@ export async function GET() {
 							sessionId,
 							lensId,
 							sseUrl: getSSEUrl(sessionId),
-							apiKey: getApiKey()
+							apiKey: getApiKey(),
+							config
 						})}\n\n`
 					)
 				);

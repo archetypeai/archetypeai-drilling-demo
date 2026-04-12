@@ -7,6 +7,7 @@
 	import RigDashboard from '$lib/components/ui/custom/rig-dashboard.svelte';
 	import ClassificationLog from '$lib/components/ui/custom/classification-log.svelte';
 	import AccuracyPanel from '$lib/components/ui/custom/accuracy-panel.svelte';
+	import ABTestingPanel from '$lib/components/ui/custom/ab-testing-panel.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import SpinnerIcon from '@lucide/svelte/icons/loader';
@@ -48,6 +49,9 @@
 	let expanded = $state(null);
 
 	let sseSource = $state(null);
+
+	// A/B testing state
+	let abSessions = $state({ a: null, b: null });
 
 	async function loadWells() {
 		try {
@@ -237,6 +241,9 @@
 				}
 			}
 
+			// Stream to A/B test sessions
+			streamToABSessions();
+
 			// Only stop if we've reached the end of ALL data (not just loaded data)
 			if (playheadIndex >= wellData.length - 1 && loadedOffset >= wellTotal) {
 				playing = false;
@@ -275,6 +282,91 @@
 
 	function toggleExpand(panel) {
 		expanded = expanded === panel ? null : panel;
+	}
+
+	// A/B testing: start a session with specific config
+	async function handleABStart(slot, config) {
+		try {
+			const result = await startSession(() => {}, config);
+			const sseEs = new EventSource(`/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`);
+
+			abSessions = {
+				...abSessions,
+				[slot]: {
+					sessionId: result.sessionId,
+					sseUrl: result.sseUrl,
+					sseSource: sseEs,
+					config,
+					classifications: [],
+					streamCounter: 0
+				}
+			};
+
+			sseEs.onmessage = (event) => {
+				try {
+					const parsed = JSON.parse(event.data);
+					if (parsed.type === 'inference.result') {
+						const raw = parsed.event_data?.response;
+						let label = '';
+						if (typeof raw === 'string') label = raw;
+						else if (Array.isArray(raw)) label = raw[0];
+						else if (raw && typeof raw === 'object') label = raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
+
+						if (label && abSessions[slot]) {
+							const windowIdx = abSessions[slot].classifications.length;
+							const stepSize = config.windowSize;
+							abSessions[slot].classifications = [
+								...abSessions[slot].classifications,
+								{
+									id: crypto.randomUUID(),
+									label: String(label),
+									windowStart: windowIdx * stepSize,
+									windowEnd: (windowIdx + 1) * stepSize
+								}
+							];
+							abSessions = { ...abSessions };
+						}
+					}
+				} catch {}
+			};
+
+			// Pre-stream first few windows
+			if (wellData.length >= config.windowSize) {
+				for (let i = 0; i < 5 && i * config.windowSize < wellData.length; i++) {
+					const start = i * config.windowSize;
+					const windowRows = wellData.slice(start, start + config.windowSize);
+					await streamWindowToNewton(result.sessionId, windowRows);
+					if (abSessions[slot]) abSessions[slot].streamCounter = i + 1;
+				}
+			}
+		} catch (err) {
+			console.error(`A/B session ${slot} failed:`, err);
+		}
+	}
+
+	async function handleABStop(slot) {
+		const session = abSessions[slot];
+		if (!session) return;
+		if (session.sseSource) session.sseSource.close();
+		if (session.sessionId) {
+			try { await endSession(session.sessionId); } catch {}
+		}
+		abSessions = { ...abSessions, [slot]: null };
+	}
+
+	// Stream data to A/B sessions during playback
+	function streamToABSessions() {
+		for (const slot of ['a', 'b']) {
+			const session = abSessions[slot];
+			if (!session?.sessionId) continue;
+			const stepSize = session.config.windowSize;
+			const nextStart = session.streamCounter * stepSize;
+			if (playheadIndex >= nextStart && nextStart + stepSize <= wellData.length) {
+				const windowRows = wellData.slice(nextStart, nextStart + stepSize);
+				streamWindowToNewton(session.sessionId, windowRows);
+				session.streamCounter++;
+			}
+		}
 	}
 
 	$effect(() => {
@@ -358,14 +450,21 @@
 		<ClassificationLog {classifications} class="max-h-full" />
 
 		{#if advancedMode}
-			<AccuracyPanel
-				{classifications}
-				rows={wellData}
-				windowSize={WINDOW_SIZE}
-				stepSize={STEP_SIZE}
-				config={currentConfig}
-				class="max-h-full"
-			/>
+			<div class="flex max-h-full flex-col gap-4 overflow-auto">
+				<AccuracyPanel
+					{classifications}
+					rows={wellData}
+					windowSize={WINDOW_SIZE}
+					stepSize={STEP_SIZE}
+					config={currentConfig}
+				/>
+				<ABTestingPanel
+					rows={wellData}
+					bind:sessionsData={abSessions}
+					onstartSession={handleABStart}
+					onstopSession={handleABStop}
+				/>
+			</div>
 		{/if}
 	</main>
 </div>

@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { streamWindow, DATA_COLUMNS, WINDOW_SIZE, STEP_SIZE } from '$lib/server/newton.js';
+import { streamWindow, DATA_COLUMNS } from '$lib/server/newton.js';
 
 export async function POST({ request }) {
 	try {
