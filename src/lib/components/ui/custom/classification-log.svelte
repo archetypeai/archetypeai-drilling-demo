@@ -22,15 +22,15 @@
 	{...restProps}
 >
 	{#if stats.total > 0}
-		<div class="flex items-center gap-4 font-mono text-xs">
+		<div class="flex flex-wrap items-center gap-2 font-mono text-[10px]">
 			<span class="text-muted-foreground">
 				Windows: <span class="text-foreground">{stats.total}</span>
 			</span>
 			<Badge variant="outline" class="bg-[#22d3ee]/20 font-mono text-[10px]">
-				Drilling: {stats.drilling} ({stats.drillingPct}%)
+				Drill: {stats.drilling} ({stats.drillingPct}%)
 			</Badge>
 			<Badge variant="outline" class="bg-[#f97316]/20 font-mono text-[10px]">
-				Not Drilling: {stats.notDrilling}
+				Not: {stats.notDrilling}
 			</Badge>
 		</div>
 	{/if}
