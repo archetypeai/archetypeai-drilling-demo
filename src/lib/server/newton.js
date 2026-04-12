@@ -93,10 +93,10 @@ export async function createDrillingSessionWithProgress(onStep) {
 	onStep('Cleaning stale lenses...');
 	await cleanStaleLenses();
 
-	onStep('Uploading drilling examples (500 rows)...');
+	onStep('Uploading drilling examples (2,000 rows)...');
 	const drillingUpload = await uploadFile(resolve('static/data/volve_drilling.csv'));
 
-	onStep('Uploading not-drilling examples (500 rows)...');
+	onStep('Uploading not-drilling examples (2,000 rows)...');
 	const notDrillingUpload = await uploadFile(resolve('static/data/volve_not_drilling.csv'));
 
 	const lensConfig = {

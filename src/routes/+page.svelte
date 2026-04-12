@@ -38,7 +38,7 @@
 	const currentConfig = {
 		windowSize: WINDOW_SIZE,
 		stepSize: STEP_SIZE,
-		nShotPerClass: 500,
+		nShotPerClass: 2000,
 		nNeighbors: 5,
 		metric: 'manhattan',
 		algorithm: 'ball_tree'
