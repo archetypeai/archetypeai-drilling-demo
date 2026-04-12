@@ -81,8 +81,8 @@ async function waitForSession(sessionId, maxWaitMs = 60000) {
 	return false;
 }
 
-const WINDOW_SIZE = 100;
-const STEP_SIZE = 100;
+const WINDOW_SIZE = 64;
+const STEP_SIZE = 1;
 const DATA_COLUMNS = ['BPOS', 'DBTM', 'FLWI', 'HDTH', 'HKLD', 'ROP', 'RPM', 'SPPA', 'WOB'];
 
 export async function createDrillingSession() {
@@ -122,8 +122,8 @@ export async function createDrillingSessionWithProgress(onStep) {
 				},
 				knn_configs: {
 					n_neighbors: 5,
-					metric: 'manhattan',
-					weights: 'distance',
+					metric: 'euclidean',
+					weights: 'uniform',
 					algorithm: 'ball_tree',
 					normalize_embeddings: false
 				}
