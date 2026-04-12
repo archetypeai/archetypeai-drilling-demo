@@ -528,13 +528,15 @@
 		<ClassificationLog {classifications} class="max-h-full" />
 
 		{#if advancedMode}
-			<div class="flex min-h-0 max-h-full flex-col gap-3 overflow-y-auto">
+			<div class="min-h-0 max-h-full overflow-y-auto">
+				<div class="flex flex-col gap-3">
 				<AccuracyPanel
 					{classifications}
 					rows={wellData}
 					windowSize={WINDOW_SIZE}
 					stepSize={STEP_SIZE}
 					config={currentConfig}
+					class="shrink-0"
 				/>
 
 				<!-- Manual / Auto tabs -->
@@ -575,6 +577,7 @@
 						onapplyConfig={handleApplyConfig}
 					/>
 				{/if}
+				</div>
 			</div>
 		{/if}
 	</main>
