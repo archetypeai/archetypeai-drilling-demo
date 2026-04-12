@@ -83,7 +83,7 @@
 <BackgroundCard
 	title="Accuracy"
 	icon={TargetIcon}
-	class={cn('flex max-h-full flex-col gap-3 overflow-hidden', className)}
+	class={cn('flex flex-col gap-3', className)}
 	{...restProps}
 >
 	<!-- Overall accuracy gauge -->

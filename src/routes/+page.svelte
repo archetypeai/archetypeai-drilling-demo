@@ -593,14 +593,13 @@
 		<ClassificationLog {classifications} class="max-h-full" />
 
 		{#if advancedMode}
-			<div class="h-full min-h-0 overflow-y-auto">
+			<div class="min-h-0 overflow-y-auto">
 				<AccuracyPanel
 					{classifications}
 					rows={wellData}
 					windowSize={WINDOW_SIZE}
 					stepSize={STEP_SIZE}
 					config={currentConfig}
-					class="min-h-full"
 				/>
 			</div>
 
