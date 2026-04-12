@@ -151,10 +151,10 @@
 
 	<!-- Guided suggestions -->
 	{#if suggestion}
-		<div class="border-border rounded-xs border p-1.5">
-			<p class="text-muted-foreground mb-0.5 text-[8px] font-medium">Suggestions:</p>
+		<div class="border-border rounded-xs border p-2">
+			<p class="text-muted-foreground mb-1 text-[10px] font-medium">Suggestions:</p>
 			{#each suggestion.slice(0, 3) as s}
-				<p class="text-foreground text-[8px]">• {s}</p>
+				<p class="text-foreground text-[10px] leading-snug">• {s}</p>
 			{/each}
 		</div>
 	{/if}
