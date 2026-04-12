@@ -64,12 +64,38 @@ Open `http://localhost:5173`, select a well, click **Start Analysis**, then pres
 
 ## How It Works
 
-1. Select a well — 5,000 downsampled rows load from the pre-processed CSV
-2. **Start Analysis** uploads n-shot CSV files (500 drilling + 500 not_drilling examples), creates a Machine State Lens session, and connects SSE
+1. Select a well — data loads incrementally from full raw CSVs (up to 1.9M rows)
+2. **Start Analysis** uploads n-shot CSV files (2,000 drilling + 2,000 not_drilling examples), creates a Machine State Lens session, and connects SSE
 3. Press **Play** — data plays back at accelerated speed, advancing the chart playhead
-4. As the playhead passes each 25-sample window boundary, the window is streamed to Newton
+4. As the playhead passes each 64-sample window boundary, the window is streamed to Newton
 5. Newton's Machine State Lens computes OmegaEncoder embeddings, runs KNN against n-shot examples, and returns a classification via SSE
 6. Results appear as colored bands on the sensor chart and entries in the classification log
+
+## Advanced Mode
+
+Toggle the gear icon (⚙) in the menubar to enable advanced features:
+
+### Live Accuracy Tracking
+- Compares Newton's predictions against ACTC ground truth in real-time
+- Only evaluates unanimous windows (all rows same ACTC label) for fair comparison
+- Shows overall accuracy, rolling 20-window accuracy, confusion matrix, precision/recall
+
+### Manual A/B Testing
+- Configure two different parameter sets (A and B) with dropdowns for window size, K neighbors, metric, and weights
+- Run both sessions in parallel on the same well data
+- Side-by-side accuracy comparison with "Apply" button for the winner
+
+### Auto Optimizer
+- Automatically tries 10 config combinations (20 windows each)
+- Searches over: window size [32/64/128], K [3/5/7], metric [euclidean/manhattan/cosine], weights [uniform/distance]
+- Shows a live leaderboard sorted by accuracy
+- "Use this" button applies the best config with one click
+
+### Config Persistence
+- Applied configs are saved to `localStorage` and restored on next app load
+- The app starts with the last-used config instead of defaults
+- Accuracy panel shows "saved" indicator when using a persisted config
+- Clearing browser data resets to defaults (window=64, euclidean, uniform, k=5)
 
 ## Architecture
 
