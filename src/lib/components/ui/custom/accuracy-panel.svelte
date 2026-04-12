@@ -87,21 +87,21 @@
 	{...restProps}
 >
 	<!-- Overall accuracy gauge -->
-	<div class="flex items-center gap-4">
+	<div class="flex flex-wrap items-center gap-3">
 		<div class="flex flex-col items-center">
-			<span class="text-foreground font-mono text-2xl font-medium">
+			<span class="text-foreground font-mono text-xl font-medium">
 				{stats.accuracy}{stats.accuracy !== '--' ? '%' : ''}
 			</span>
-			<span class="text-muted-foreground text-[10px]">Overall</span>
+			<span class="text-muted-foreground text-[9px]">Overall</span>
 		</div>
 		<div class="flex flex-col items-center">
-			<span class="text-foreground font-mono text-2xl font-medium">
+			<span class="text-foreground font-mono text-xl font-medium">
 				{rollingAccuracy}{rollingAccuracy !== '--' ? '%' : ''}
 			</span>
-			<span class="text-muted-foreground text-[10px]">Rolling (20)</span>
+			<span class="text-muted-foreground text-[9px]">Rolling</span>
 		</div>
-		<div class="flex flex-col gap-1">
-			<div class="flex gap-2 font-mono text-[10px]">
+		<div class="flex flex-col gap-0.5">
+			<div class="flex gap-2 font-mono text-[9px]">
 				<span class="text-atai-good">{stats.correct} correct</span>
 				<span class="text-atai-critical">{stats.incorrect} wrong</span>
 				{#if stats.skipped > 0}
