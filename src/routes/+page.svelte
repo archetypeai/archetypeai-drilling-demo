@@ -593,17 +593,18 @@
 		<ClassificationLog {classifications} class="max-h-full" />
 
 		{#if advancedMode}
-			<div class="min-h-0 max-h-full overflow-y-auto">
+			<div class="h-full min-h-0 overflow-y-auto">
 				<AccuracyPanel
 					{classifications}
 					rows={wellData}
 					windowSize={WINDOW_SIZE}
 					stepSize={STEP_SIZE}
 					config={currentConfig}
+					class="min-h-full"
 				/>
 			</div>
 
-			<div class="flex min-h-0 max-h-full flex-col gap-3 overflow-y-auto">
+			<div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
 				<div class="flex gap-1">
 					<Button
 						variant={advancedTab === 'manual' ? 'default' : 'outline'}
@@ -630,6 +631,7 @@
 						onstartSession={handleABStart}
 						onstopSession={handleABStop}
 						onapplyConfig={handleApplyConfig}
+						class="min-h-0 flex-1"
 					/>
 				{:else}
 					<AutoOptimizer
@@ -640,6 +642,7 @@
 						onstartConfig={handleOptimizerStart}
 						onstopConfig={handleOptimizerStop}
 						onapplyConfig={handleApplyConfig}
+						class="min-h-0 flex-1"
 					/>
 				{/if}
 			</div>
