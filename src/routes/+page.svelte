@@ -1,13 +1,16 @@
 <script>
+	import { cn } from '$lib/utils.js';
 	import Menubar from '$lib/components/ui/patterns/menubar/index.js';
 	import { Button } from '$lib/components/ui/primitives/button/index.js';
 	import StatusBadge from '$lib/components/ui/patterns/status-badge/status-badge.svelte';
 	import WellSelector from '$lib/components/ui/custom/well-selector.svelte';
 	import RigDashboard from '$lib/components/ui/custom/rig-dashboard.svelte';
 	import ClassificationLog from '$lib/components/ui/custom/classification-log.svelte';
+	import AccuracyPanel from '$lib/components/ui/custom/accuracy-panel.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import SpinnerIcon from '@lucide/svelte/icons/loader';
+	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
 	const WINDOW_SIZE = 25;
@@ -30,6 +33,16 @@
 	let apiKey = $state(null);
 	let sessionStatus = $state('idle');
 	let setupStep = $state('');
+	let advancedMode = $state(false);
+
+	const currentConfig = {
+		windowSize: WINDOW_SIZE,
+		stepSize: STEP_SIZE,
+		nShotPerClass: 500,
+		nNeighbors: 5,
+		metric: 'manhattan',
+		algorithm: 'ball_tree'
+	};
 	let classifications = $state([]);
 	let streamCounter = $state(0);
 	let expanded = $state(null);
@@ -293,6 +306,14 @@
 			{:else}
 				<Button variant="outline" size="sm" onclick={handleStop}>Stop</Button>
 			{/if}
+			<Button
+				variant={advancedMode ? 'default' : 'ghost'}
+				size="icon-sm"
+				aria-label="Toggle advanced mode"
+				onclick={() => (advancedMode = !advancedMode)}
+			>
+				<SettingsIcon class="size-3.5" />
+			</Button>
 		</div>
 	</Menubar>
 
@@ -320,7 +341,10 @@
 		/>
 	</div>
 
-	<main class="grid grid-cols-[2fr_1fr] grid-rows-1 gap-4 overflow-hidden p-4">
+	<main class={cn(
+		'grid gap-4 overflow-hidden p-4',
+		advancedMode ? 'grid-cols-[2fr_1fr_1fr] grid-rows-1' : 'grid-cols-[2fr_1fr] grid-rows-1'
+	)}>
 		<RigDashboard
 			rows={wellData}
 			{playheadIndex}
@@ -332,6 +356,17 @@
 		/>
 
 		<ClassificationLog {classifications} class="max-h-full" />
+
+		{#if advancedMode}
+			<AccuracyPanel
+				{classifications}
+				rows={wellData}
+				windowSize={WINDOW_SIZE}
+				stepSize={STEP_SIZE}
+				config={currentConfig}
+				class="max-h-full"
+			/>
+		{/if}
 	</main>
 </div>
 
