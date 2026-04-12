@@ -135,45 +135,27 @@
 
 	<!-- Comparison -->
 	{#if accuracyA !== '--' || accuracyB !== '--'}
-		<div class="border-border flex items-center justify-between rounded-xs border p-2">
-			<div class="flex items-center gap-3">
-				<div class="flex items-center gap-1">
-					<Badge variant="outline" class="border-[#22d3ee] font-mono text-[10px] text-[#22d3ee]">A</Badge>
-					<span class="font-mono text-sm text-[#22d3ee]">{accuracyA}%</span>
-					<span class="text-muted-foreground text-[10px]">({sessionsData.a?.classifications?.length ?? 0} windows)</span>
-				</div>
-				<span class="text-muted-foreground text-sm">vs</span>
-				<div class="flex items-center gap-1">
-					<Badge variant="outline" class="border-[#facc15] font-mono text-[10px] text-[#facc15]">B</Badge>
-					<span class="font-mono text-sm text-[#facc15]">{accuracyB}%</span>
-					<span class="text-muted-foreground text-[10px]">({sessionsData.b?.classifications?.length ?? 0} windows)</span>
-				</div>
-			</div>
+		<div class="border-border flex flex-wrap items-center gap-2 rounded-xs border p-1.5 font-mono text-[9px]">
+			<span class="text-[#22d3ee]">A:{accuracyA}%<span class="text-muted-foreground">({sessionsData.a?.classifications?.length ?? 0}w)</span></span>
+			<span class="text-muted-foreground">vs</span>
+			<span class="text-[#facc15]">B:{accuracyB}%<span class="text-muted-foreground">({sessionsData.b?.classifications?.length ?? 0}w)</span></span>
 			{#if winner === 'A'}
-				<Button variant="default" size="sm" onclick={() => onapplyConfig?.({ ...configA, stepSize: configA.windowSize })}>
-					<CheckIcon class="size-3" aria-hidden="true" />
-					Apply A
-				</Button>
+				<Button variant="default" size="sm" class="ml-auto text-[9px]" onclick={() => onapplyConfig?.({ ...configA, stepSize: configA.windowSize })}>Apply A</Button>
 			{:else if winner === 'B'}
-				<Button variant="default" size="sm" onclick={() => onapplyConfig?.({ ...configB, stepSize: configB.windowSize })}>
-					<CheckIcon class="size-3" aria-hidden="true" />
-					Apply B
-				</Button>
+				<Button variant="default" size="sm" class="ml-auto text-[9px]" onclick={() => onapplyConfig?.({ ...configB, stepSize: configB.windowSize })}>Apply B</Button>
 			{:else if winner === 'tie'}
-				<Badge variant="outline" class="font-mono text-[10px]">Tie</Badge>
+				<span class="text-muted-foreground ml-auto">Tie</span>
 			{/if}
 		</div>
 	{/if}
 
 	<!-- Guided suggestions -->
 	{#if suggestion}
-		<div class="border-border rounded-xs border p-2">
-			<p class="text-muted-foreground mb-1 text-[10px] font-medium">Suggested next experiments:</p>
-			<ul class="flex flex-col gap-1">
-				{#each suggestion as s}
-					<li class="text-foreground text-[10px]">• {s}</li>
-				{/each}
-			</ul>
+		<div class="border-border rounded-xs border p-1.5">
+			<p class="text-muted-foreground mb-0.5 text-[8px] font-medium">Suggestions:</p>
+			{#each suggestion.slice(0, 3) as s}
+				<p class="text-foreground text-[8px]">• {s}</p>
+			{/each}
 		</div>
 	{/if}
 </BackgroundCard>
