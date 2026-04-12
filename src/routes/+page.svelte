@@ -550,15 +550,15 @@
 			{:else}
 				<Button variant="outline" size="sm" onclick={handleStop}>Stop</Button>
 			{/if}
-			<Button
-				variant={advancedMode ? 'default' : 'ghost'}
-				size="icon-sm"
-				aria-label="Toggle advanced mode"
-				onclick={() => (advancedMode = !advancedMode)}
-			>
-				<SettingsIcon class="size-3.5" />
-			</Button>
 		</div>
+		<Button
+			variant={advancedMode ? 'default' : 'ghost'}
+			size="icon-sm"
+			aria-label="Toggle advanced mode"
+			onclick={() => { advancedMode = !advancedMode; }}
+		>
+			<SettingsIcon class="size-3.5" />
+		</Button>
 	</Menubar>
 
 	<div class="border-border flex items-center gap-6 border-b px-4 py-2">
