@@ -167,58 +167,64 @@
 		}
 	}
 
-	function startSSE() {
-		if (!sseUrl || !apiKey) return;
+	function parseSSELabel(event) {
+		try {
+			const parsed = JSON.parse(event.data);
+			if (parsed.type === 'inference.result') {
+				const raw = parsed.event_data?.response;
+				if (typeof raw === 'string') return raw;
+				if (Array.isArray(raw)) return raw[0];
+				if (raw && typeof raw === 'object') return raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
+			}
+		} catch {}
+		return null;
+	}
 
-		const es = new EventSource(`/api/sse-proxy?url=${encodeURIComponent(sseUrl)}`);
+	function connectSSE(url, onLabel) {
+		const es = new EventSource(url);
+		let reconnectAttempts = 0;
 
 		es.onmessage = (event) => {
-			try {
-				const parsed = JSON.parse(event.data);
-
-				if (parsed.type === 'inference.result') {
-					const raw = parsed.event_data?.response;
-					let label = '';
-
-					// Extract the label string from various response formats
-					if (typeof raw === 'string') {
-						label = raw;
-					} else if (Array.isArray(raw)) {
-						label = raw[0];
-					} else if (raw && typeof raw === 'object') {
-						// Could be { class_name: 'DRILLING', ... } or similar
-						label = raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
-					}
-
-					if (label) {
-						const windowIdx = classifications.length;
-						classifications = [
-							...classifications,
-							{
-								id: crypto.randomUUID(),
-								label: String(label),
-								windowStart: windowIdx * STEP_SIZE,
-								windowEnd: (windowIdx + 1) * STEP_SIZE
-							}
-						];
-					}
-				}
-
-				// Also handle training completion events
-				if (parsed.type === 'session.modify.result') {
-					const cls = parsed.event_data?.query_metadata?.class_name;
-					if (cls) console.log(`[TRAINING] Processed class: ${cls}`);
-				}
-			} catch {
-				// ignore parse errors
-			}
+			reconnectAttempts = 0;
+			const label = parseSSELabel(event);
+			if (label) onLabel(String(label));
 		};
 
 		es.onerror = () => {
-			// SSE will auto-reconnect
+			reconnectAttempts++;
+			if (reconnectAttempts > 5) {
+				console.warn('SSE reconnect limit reached, closing');
+				es.close();
+				// Try a fresh connection after a delay
+				setTimeout(() => {
+					if (sessionId) {
+						console.log('Attempting SSE reconnect...');
+						const newEs = connectSSE(url, onLabel);
+						sseSource = newEs;
+					}
+				}, 3000);
+			}
 		};
 
-		sseSource = es;
+		return es;
+	}
+
+	function startSSE() {
+		if (!sseUrl) return;
+
+		const url = `/api/sse-proxy?url=${encodeURIComponent(sseUrl)}`;
+		sseSource = connectSSE(url, (label) => {
+			const windowIdx = classifications.length;
+			classifications = [
+				...classifications,
+				{
+					id: crypto.randomUUID(),
+					label,
+					windowStart: windowIdx * STEP_SIZE,
+					windowEnd: (windowIdx + 1) * STEP_SIZE
+				}
+			];
+		});
 	}
 
 	async function preStreamWindows(count) {
@@ -324,47 +330,37 @@
 	async function handleABStart(slot, config) {
 		try {
 			const result = await startSession(() => {}, config);
-			const sseEs = new EventSource(`/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`);
+			const sseUrl = `/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`;
 
 			abSessions = {
 				...abSessions,
 				[slot]: {
 					sessionId: result.sessionId,
 					sseUrl: result.sseUrl,
-					sseSource: sseEs,
+					sseSource: null,
 					config,
 					classifications: [],
 					streamCounter: 0
 				}
 			};
 
-			sseEs.onmessage = (event) => {
-				try {
-					const parsed = JSON.parse(event.data);
-					if (parsed.type === 'inference.result') {
-						const raw = parsed.event_data?.response;
-						let label = '';
-						if (typeof raw === 'string') label = raw;
-						else if (Array.isArray(raw)) label = raw[0];
-						else if (raw && typeof raw === 'object') label = raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
-
-						if (label && abSessions[slot]) {
-							const windowIdx = abSessions[slot].classifications.length;
-							const stepSize = config.windowSize;
-							abSessions[slot].classifications = [
-								...abSessions[slot].classifications,
-								{
-									id: crypto.randomUUID(),
-									label: String(label),
-									windowStart: windowIdx * stepSize,
-									windowEnd: (windowIdx + 1) * stepSize
-								}
-							];
-							abSessions = { ...abSessions };
+			const sseEs = connectSSE(sseUrl, (label) => {
+				if (abSessions[slot]) {
+					const windowIdx = abSessions[slot].classifications.length;
+					const stepSize = config.windowSize;
+					abSessions[slot].classifications = [
+						...abSessions[slot].classifications,
+						{
+							id: crypto.randomUUID(),
+							label,
+							windowStart: windowIdx * stepSize,
+							windowEnd: (windowIdx + 1) * stepSize
 						}
-					}
-				} catch {}
-			};
+					];
+					abSessions = { ...abSessions };
+				}
+			});
+			abSessions[slot].sseSource = sseEs;
 
 			// Wait for n-shot processing then pre-stream windows
 			await new Promise((r) => setTimeout(r, 3000));
