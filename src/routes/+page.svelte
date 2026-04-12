@@ -9,6 +9,7 @@
 	import AccuracyPanel from '$lib/components/ui/custom/accuracy-panel.svelte';
 	import ABTestingPanel from '$lib/components/ui/custom/ab-testing-panel.svelte';
 	import AutoOptimizer from '$lib/components/ui/custom/auto-optimizer.svelte';
+	import ConfirmModal from '$lib/components/ui/custom/confirm-modal.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import SpinnerIcon from '@lucide/svelte/icons/loader';
@@ -39,14 +40,18 @@
 	let setupStep = $state('');
 	let advancedMode = $state(false);
 
-	const currentConfig = {
+	let currentConfig = $state({
 		windowSize: WINDOW_SIZE,
 		stepSize: STEP_SIZE,
 		nShotPerClass: 2000,
 		nNeighbors: 5,
 		metric: 'euclidean',
 		algorithm: 'ball_tree'
-	};
+	});
+
+	// Config apply modal
+	let showApplyModal = $state(false);
+	let pendingConfig = $state(null);
 	let classifications = $state([]);
 	let streamCounter = $state(0);
 	let expanded = $state(null);
@@ -423,13 +428,51 @@
 	}
 
 	function handleApplyConfig(config) {
-		// Apply the best config to the main session config display
-		currentConfig.windowSize = config.windowSize;
-		currentConfig.stepSize = config.stepSize || config.windowSize;
-		currentConfig.nNeighbors = config.nNeighbors;
-		currentConfig.metric = config.metric;
-		// TODO: would need to restart main session with this config
-		alert(`Best config applied: window=${config.windowSize}, k=${config.nNeighbors}, metric=${config.metric}, weights=${config.weights}\n\nRestart analysis to use this config.`);
+		pendingConfig = { ...config, stepSize: config.stepSize || config.windowSize };
+		showApplyModal = true;
+	}
+
+	async function confirmApplyConfig() {
+		if (!pendingConfig) return;
+
+		// Stop current main session
+		await handleStop();
+
+		// Update config
+		currentConfig = {
+			...currentConfig,
+			windowSize: pendingConfig.windowSize,
+			stepSize: pendingConfig.stepSize,
+			nNeighbors: pendingConfig.nNeighbors,
+			metric: pendingConfig.metric,
+			algorithm: pendingConfig.algorithm || 'ball_tree'
+		};
+
+		// Reset state
+		classifications = [];
+		streamCounter = 0;
+		playheadIndex = 0;
+
+		// Start new session with the applied config
+		sessionStatus = 'connecting';
+		setupStep = 'Applying new config...';
+
+		try {
+			const result = await startSession((step) => { setupStep = step; }, pendingConfig);
+			sessionId = result.sessionId;
+			sseUrl = result.sseUrl;
+			apiKey = result.apiKey;
+			sessionStatus = 'active';
+			setupStep = '';
+			startSSE();
+			preStreamWindows(5);
+		} catch (err) {
+			console.error('Session failed:', err);
+			sessionStatus = 'error';
+			setupStep = '';
+		}
+
+		pendingConfig = null;
 	}
 
 	// Stream data to A/B sessions during playback
@@ -565,6 +608,7 @@
 						bind:sessionsData={abSessions}
 						onstartSession={handleABStart}
 						onstopSession={handleABStop}
+						onapplyConfig={handleApplyConfig}
 					/>
 				{:else}
 					<AutoOptimizer
@@ -605,3 +649,33 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Apply config confirmation modal -->
+<ConfirmModal
+	bind:open={showApplyModal}
+	title="Apply Config"
+	onconfirm={confirmApplyConfig}
+>
+	{#if pendingConfig}
+		<p class="text-foreground mb-3 text-sm">
+			This will stop the current session and restart with the new config:
+		</p>
+		<div class="border-border rounded-xs border p-3">
+			<div class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-sm">
+				<span class="text-muted-foreground">Window size</span>
+				<span class="text-foreground">{pendingConfig.windowSize}</span>
+				<span class="text-muted-foreground">Step size</span>
+				<span class="text-foreground">{pendingConfig.stepSize || pendingConfig.windowSize}</span>
+				<span class="text-muted-foreground">K neighbors</span>
+				<span class="text-foreground">{pendingConfig.nNeighbors}</span>
+				<span class="text-muted-foreground">Metric</span>
+				<span class="text-foreground">{pendingConfig.metric}</span>
+				<span class="text-muted-foreground">Weights</span>
+				<span class="text-foreground">{pendingConfig.weights}</span>
+			</div>
+		</div>
+		<p class="text-muted-foreground mt-3 text-xs">
+			Playback will reset. Classification history will be cleared.
+		</p>
+	{/if}
+</ConfirmModal>

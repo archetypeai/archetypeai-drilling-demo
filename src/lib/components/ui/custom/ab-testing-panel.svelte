@@ -11,11 +11,14 @@
 		'8': 'NOT_DRILLING', '9': 'NOT_DRILLING'
 	};
 
+	import CheckIcon from '@lucide/svelte/icons/check';
+
 	let {
 		rows = [],
 		sessionsData = $bindable({ a: null, b: null }),
 		onstartSession,
 		onstopSession,
+		onapplyConfig,
 		class: className,
 		...restProps
 	} = $props();
@@ -147,9 +150,15 @@
 				</div>
 			</div>
 			{#if winner === 'A'}
-				<Badge variant="outline" class="bg-[#22d3ee]/20 font-mono text-[10px]">A wins</Badge>
+				<Button variant="default" size="sm" onclick={() => onapplyConfig?.({ ...configA, stepSize: configA.windowSize })}>
+					<CheckIcon class="size-3" aria-hidden="true" />
+					Apply A
+				</Button>
 			{:else if winner === 'B'}
-				<Badge variant="outline" class="bg-[#facc15]/20 font-mono text-[10px]">B wins</Badge>
+				<Button variant="default" size="sm" onclick={() => onapplyConfig?.({ ...configB, stepSize: configB.windowSize })}>
+					<CheckIcon class="size-3" aria-hidden="true" />
+					Apply B
+				</Button>
 			{:else if winner === 'tie'}
 				<Badge variant="outline" class="font-mono text-[10px]">Tie</Badge>
 			{/if}
