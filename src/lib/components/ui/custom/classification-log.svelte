@@ -22,16 +22,10 @@
 	{...restProps}
 >
 	{#if stats.total > 0}
-		<div class="flex flex-wrap items-center gap-2 font-mono text-[10px]">
-			<span class="text-muted-foreground">
-				Windows: <span class="text-foreground">{stats.total}</span>
-			</span>
-			<Badge variant="outline" class="bg-[#22d3ee]/20 font-mono text-[10px]">
-				Drill: {stats.drilling} ({stats.drillingPct}%)
-			</Badge>
-			<Badge variant="outline" class="bg-[#f97316]/20 font-mono text-[10px]">
-				Not: {stats.notDrilling}
-			</Badge>
+		<div class="flex flex-wrap items-center gap-1.5 font-mono text-[9px]">
+			<span class="text-foreground">{stats.total}w</span>
+			<span class="rounded-xs bg-[#22d3ee]/20 px-1 py-0.5 text-[#22d3ee]">{stats.drilling} ({stats.drillingPct}%)</span>
+			<span class="rounded-xs bg-[#f97316]/20 px-1 py-0.5 text-[#f97316]">{stats.notDrilling} not</span>
 		</div>
 	{/if}
 
@@ -43,24 +37,17 @@
 				</p>
 			{:else}
 				{#each [...classifications].reverse() as cls, i (cls.id)}
-					<div class="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-2 py-1">
-						<Badge
-							variant="outline"
-							class={cn(
-								'w-28 justify-center font-mono text-[10px]',
-								cls.label === 'DRILLING'
-									? 'bg-[#22d3ee]/20'
-									: 'bg-[#f97316]/20'
-							)}
-						>
-							{cls.label}
-						</Badge>
-						<span class="text-muted-foreground font-mono text-[10px]">
-							Window {cls.windowStart}–{cls.windowEnd}
+					<div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-1 py-0.5 font-mono text-[9px]">
+						<span class={cn(
+							'w-16 truncate rounded-xs px-1 py-0.5 text-center',
+							cls.label === 'DRILLING'
+								? 'bg-[#22d3ee]/20 text-[#22d3ee]'
+								: 'bg-[#f97316]/20 text-[#f97316]'
+						)}>
+							{cls.label === 'DRILLING' ? 'DRILL' : 'NOT'}
 						</span>
-						<span class="text-muted-foreground font-mono text-[10px]">
-							#{classifications.length - i}
-						</span>
+						<span class="text-muted-foreground">{cls.windowStart}–{cls.windowEnd}</span>
+						<span class="text-muted-foreground">#{classifications.length - i}</span>
 					</div>
 				{/each}
 			{/if}
