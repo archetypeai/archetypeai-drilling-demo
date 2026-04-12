@@ -22,10 +22,16 @@
 	{...restProps}
 >
 	{#if stats.total > 0}
-		<div class="flex flex-wrap items-center gap-1.5 font-mono text-[9px]">
-			<span class="text-foreground">{stats.total}w</span>
-			<span class="rounded-xs bg-[#22d3ee]/20 px-1 py-0.5 text-[#22d3ee]">{stats.drilling} ({stats.drillingPct}%)</span>
-			<span class="rounded-xs bg-[#f97316]/20 px-1 py-0.5 text-[#f97316]">{stats.notDrilling} not</span>
+		<div class="flex flex-wrap items-center gap-2 font-mono text-[10px]">
+			<span class="text-muted-foreground">
+				Windows: <span class="text-foreground">{stats.total}</span>
+			</span>
+			<span class="rounded-xs bg-[#22d3ee]/20 px-1.5 py-0.5 text-[#22d3ee]">
+				Drilling: {stats.drilling} ({stats.drillingPct}%)
+			</span>
+			<span class="rounded-xs bg-[#f97316]/20 px-1.5 py-0.5 text-[#f97316]">
+				Not: {stats.notDrilling}
+			</span>
 		</div>
 	{/if}
 
@@ -37,17 +43,17 @@
 				</p>
 			{:else}
 				{#each [...classifications].reverse() as cls, i (cls.id)}
-					<div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-1 py-0.5 font-mono text-[9px]">
+					<div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-1 py-0.5 font-mono text-[10px]">
 						<span class={cn(
-							'w-16 truncate rounded-xs px-1 py-0.5 text-center',
+							'w-20 rounded-xs px-1.5 py-0.5 text-center text-[9px]',
 							cls.label === 'DRILLING'
 								? 'bg-[#22d3ee]/20 text-[#22d3ee]'
 								: 'bg-[#f97316]/20 text-[#f97316]'
 						)}>
-							{cls.label === 'DRILLING' ? 'DRILL' : 'NOT'}
+							{cls.label === 'DRILLING' ? 'DRILLING' : 'NOT_DRILL'}
 						</span>
-						<span class="text-muted-foreground">{cls.windowStart}–{cls.windowEnd}</span>
-						<span class="text-muted-foreground">#{classifications.length - i}</span>
+						<span class="text-muted-foreground text-[9px]">{cls.windowStart}–{cls.windowEnd}</span>
+						<span class="text-muted-foreground text-[9px]">#{classifications.length - i}</span>
 					</div>
 				{/each}
 			{/if}
