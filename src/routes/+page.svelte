@@ -18,8 +18,35 @@
 	import FlaskConicalIcon from '@lucide/svelte/icons/flask-conical';
 	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
-	const WINDOW_SIZE = 64;
-	const STEP_SIZE = 64;
+	const DEFAULT_CONFIG = {
+		windowSize: 64,
+		stepSize: 64,
+		nShotPerClass: 2000,
+		nNeighbors: 5,
+		metric: 'euclidean',
+		algorithm: 'ball_tree'
+	};
+	const CONFIG_KEY = 'newton-drilling-config';
+
+	function loadSavedConfig() {
+		if (typeof localStorage === 'undefined') return { ...DEFAULT_CONFIG };
+		try {
+			const saved = localStorage.getItem(CONFIG_KEY);
+			if (saved) return { ...DEFAULT_CONFIG, ...JSON.parse(saved), saved: true };
+		} catch {}
+		return { ...DEFAULT_CONFIG };
+	}
+
+	function saveConfig(config) {
+		if (typeof localStorage === 'undefined') return;
+		try {
+			localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
+		} catch {}
+	}
+
+	const savedConfig = loadSavedConfig();
+	const WINDOW_SIZE = savedConfig.windowSize;
+	const STEP_SIZE = savedConfig.stepSize;
 
 	const CHUNK_SIZE = 5000;
 
@@ -40,14 +67,7 @@
 	let setupStep = $state('');
 	let advancedMode = $state(false);
 
-	let currentConfig = $state({
-		windowSize: WINDOW_SIZE,
-		stepSize: STEP_SIZE,
-		nShotPerClass: 2000,
-		nNeighbors: 5,
-		metric: 'euclidean',
-		algorithm: 'ball_tree'
-	});
+	let currentConfig = $state({ ...savedConfig });
 
 	// Config apply modal
 	let showApplyModal = $state(false);
@@ -438,15 +458,17 @@
 		// Stop current main session
 		await handleStop();
 
-		// Update config
+		// Update config and persist to localStorage
 		currentConfig = {
 			...currentConfig,
 			windowSize: pendingConfig.windowSize,
 			stepSize: pendingConfig.stepSize,
 			nNeighbors: pendingConfig.nNeighbors,
 			metric: pendingConfig.metric,
+			weights: pendingConfig.weights || 'uniform',
 			algorithm: pendingConfig.algorithm || 'ball_tree'
 		};
+		saveConfig(currentConfig);
 
 		// Reset state
 		classifications = [];
@@ -673,6 +695,7 @@
 		</div>
 		<p class="text-muted-foreground mt-3 text-xs">
 			Playback will reset. Classification history will be cleared.
+			This config will be saved and used on next app load.
 		</p>
 	{/if}
 </ConfirmModal>

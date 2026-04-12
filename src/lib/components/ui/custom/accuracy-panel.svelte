@@ -135,7 +135,12 @@
 
 	<!-- Current config -->
 	<div class="border-border rounded-xs border p-2">
-		<p class="text-muted-foreground mb-1 text-[10px]">Current Config</p>
+		<div class="mb-1 flex items-center justify-between">
+			<p class="text-muted-foreground text-[10px]">Current Config</p>
+			{#if config.saved}
+				<span class="text-atai-neutral text-[9px]">saved</span>
+			{/if}
+		</div>
 		<div class="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-[10px]">
 			<span class="text-muted-foreground">Window size</span>
 			<span class="text-foreground">{config.windowSize ?? 25}</span>
