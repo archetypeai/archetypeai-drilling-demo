@@ -450,7 +450,7 @@
 		<ClassificationLog {classifications} class="max-h-full" />
 
 		{#if advancedMode}
-			<div class="flex max-h-full flex-col gap-4 overflow-auto">
+			<div class="flex min-h-0 max-h-full flex-col gap-4 overflow-y-auto">
 				<AccuracyPanel
 					{classifications}
 					rows={wellData}
