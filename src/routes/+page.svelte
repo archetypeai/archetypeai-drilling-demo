@@ -556,7 +556,7 @@
 
 	<main class={cn(
 		'grid gap-4 overflow-hidden p-4',
-		advancedMode ? 'grid-cols-[2fr_1fr_1fr] grid-rows-1' : 'grid-cols-[2fr_1fr] grid-rows-1'
+		advancedMode ? 'grid-cols-[2fr_1fr_1fr_1fr] grid-rows-1' : 'grid-cols-[2fr_1fr] grid-rows-1'
 	)}>
 		<RigDashboard
 			rows={wellData}
@@ -571,18 +571,16 @@
 		<ClassificationLog {classifications} class="max-h-full" />
 
 		{#if advancedMode}
-			<div class="min-h-0 max-h-full overflow-y-auto">
-				<div class="flex flex-col gap-3">
-				<AccuracyPanel
-					{classifications}
-					rows={wellData}
-					windowSize={WINDOW_SIZE}
-					stepSize={STEP_SIZE}
-					config={currentConfig}
-					class="shrink-0"
-				/>
+			<AccuracyPanel
+				{classifications}
+				rows={wellData}
+				windowSize={WINDOW_SIZE}
+				stepSize={STEP_SIZE}
+				config={currentConfig}
+				class="max-h-full"
+			/>
 
-				<!-- Manual / Auto tabs -->
+			<div class="flex min-h-0 max-h-full flex-col gap-3 overflow-y-auto">
 				<div class="flex gap-1">
 					<Button
 						variant={advancedTab === 'manual' ? 'default' : 'outline'}
@@ -621,7 +619,6 @@
 						onapplyConfig={handleApplyConfig}
 					/>
 				{/if}
-				</div>
 			</div>
 		{/if}
 	</main>
