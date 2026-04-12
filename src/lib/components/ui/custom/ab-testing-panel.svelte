@@ -133,18 +133,17 @@
 		/>
 	</div>
 
-	<!-- Comparison -->
-	{#if accuracyA !== '--' || accuracyB !== '--'}
-		<div class="border-border flex flex-wrap items-center gap-2 rounded-xs border p-1.5 font-mono text-[9px]">
-			<span class="text-[#22d3ee]">A:{accuracyA}%<span class="text-muted-foreground">({sessionsData.a?.classifications?.length ?? 0}w)</span></span>
-			<span class="text-muted-foreground">vs</span>
-			<span class="text-[#facc15]">B:{accuracyB}%<span class="text-muted-foreground">({sessionsData.b?.classifications?.length ?? 0}w)</span></span>
+	<!-- Winner + Apply -->
+	{#if accuracyA !== '--' && accuracyB !== '--'}
+		<div class="border-border flex items-center justify-between rounded-xs border p-1.5 font-mono text-[10px]">
 			{#if winner === 'A'}
-				<Button variant="default" size="sm" class="ml-auto text-[9px]" onclick={() => onapplyConfig?.({ ...configA, stepSize: configA.windowSize })}>Apply A</Button>
+				<span class="text-[#22d3ee]">A wins ({accuracyA}% vs {accuracyB}%)</span>
+				<Button variant="default" size="sm" onclick={() => onapplyConfig?.({ ...configA, stepSize: configA.windowSize })}>Apply A</Button>
 			{:else if winner === 'B'}
-				<Button variant="default" size="sm" class="ml-auto text-[9px]" onclick={() => onapplyConfig?.({ ...configB, stepSize: configB.windowSize })}>Apply B</Button>
-			{:else if winner === 'tie'}
-				<span class="text-muted-foreground ml-auto">Tie</span>
+				<span class="text-[#facc15]">B wins ({accuracyB}% vs {accuracyA}%)</span>
+				<Button variant="default" size="sm" onclick={() => onapplyConfig?.({ ...configB, stepSize: configB.windowSize })}>Apply B</Button>
+			{:else}
+				<span class="text-muted-foreground">Tie ({accuracyA}% each)</span>
 			{/if}
 		</div>
 	{/if}
