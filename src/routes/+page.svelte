@@ -8,10 +8,13 @@
 	import ClassificationLog from '$lib/components/ui/custom/classification-log.svelte';
 	import AccuracyPanel from '$lib/components/ui/custom/accuracy-panel.svelte';
 	import ABTestingPanel from '$lib/components/ui/custom/ab-testing-panel.svelte';
+	import AutoOptimizer from '$lib/components/ui/custom/auto-optimizer.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import SpinnerIcon from '@lucide/svelte/icons/loader';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
+	import WandIcon from '@lucide/svelte/icons/wand-sparkles';
+	import FlaskConicalIcon from '@lucide/svelte/icons/flask-conical';
 	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
 	const WINDOW_SIZE = 64;
@@ -52,6 +55,14 @@
 
 	// A/B testing state
 	let abSessions = $state({ a: null, b: null });
+
+	// Optimizer state
+	let advancedTab = $state('manual'); // 'manual' | 'auto'
+	let optimizerRunning = $state(false);
+	let optimizerResults = $state([]);
+	let optimizerRef = $state(null);
+	let optimizerSession = $state(null);
+	let optimizerSseSource = $state(null);
 
 	async function loadWells() {
 		try {
@@ -354,6 +365,73 @@
 		abSessions = { ...abSessions, [slot]: null };
 	}
 
+	// Auto optimizer: start a config
+	async function handleOptimizerStart(config) {
+		// Clean up previous optimizer session
+		if (optimizerSseSource) optimizerSseSource.close();
+		if (optimizerSession) {
+			try { await endSession(optimizerSession); } catch {}
+		}
+
+		const result = await startSession(() => {}, config);
+		optimizerSession = result.sessionId;
+
+		const es = new EventSource(`/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`);
+		optimizerSseSource = es;
+
+		es.onmessage = (event) => {
+			try {
+				const parsed = JSON.parse(event.data);
+				if (parsed.type === 'inference.result') {
+					const raw = parsed.event_data?.response;
+					let label = '';
+					if (typeof raw === 'string') label = raw;
+					else if (Array.isArray(raw)) label = raw[0];
+					else if (raw && typeof raw === 'object') label = raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
+
+					if (label && optimizerRef) {
+						const idx = optimizerRef.results?.findIndex((r) => r.status === 'running') ?? -1;
+						if (idx >= 0) {
+							const stepSize = optimizerRef.results[idx].config.windowSize;
+							const windowIdx = optimizerRef.results[idx].classifications.length;
+							optimizerRef.receiveClassification(
+								String(label),
+								windowIdx * stepSize,
+								(windowIdx + 1) * stepSize
+							);
+						}
+					}
+				}
+			} catch {}
+		};
+
+		// Stream windows for this config
+		const windowSize = config.windowSize;
+		for (let i = 0; i < 20 && i * windowSize + windowSize <= wellData.length; i++) {
+			const start = i * windowSize;
+			const windowRows = wellData.slice(start, start + windowSize);
+			await streamWindowToNewton(result.sessionId, windowRows);
+		}
+	}
+
+	async function handleOptimizerStop() {
+		if (optimizerSseSource) { optimizerSseSource.close(); optimizerSseSource = null; }
+		if (optimizerSession) {
+			try { await endSession(optimizerSession); } catch {}
+			optimizerSession = null;
+		}
+	}
+
+	function handleApplyConfig(config) {
+		// Apply the best config to the main session config display
+		currentConfig.windowSize = config.windowSize;
+		currentConfig.stepSize = config.stepSize || config.windowSize;
+		currentConfig.nNeighbors = config.nNeighbors;
+		currentConfig.metric = config.metric;
+		// TODO: would need to restart main session with this config
+		alert(`Best config applied: window=${config.windowSize}, k=${config.nNeighbors}, metric=${config.metric}, weights=${config.weights}\n\nRestart analysis to use this config.`);
+	}
+
 	// Stream data to A/B sessions during playback
 	function streamToABSessions() {
 		for (const slot of ['a', 'b']) {
@@ -450,7 +528,7 @@
 		<ClassificationLog {classifications} class="max-h-full" />
 
 		{#if advancedMode}
-			<div class="flex min-h-0 max-h-full flex-col gap-4 overflow-y-auto">
+			<div class="flex min-h-0 max-h-full flex-col gap-3 overflow-y-auto">
 				<AccuracyPanel
 					{classifications}
 					rows={wellData}
@@ -458,12 +536,45 @@
 					stepSize={STEP_SIZE}
 					config={currentConfig}
 				/>
-				<ABTestingPanel
-					rows={wellData}
-					bind:sessionsData={abSessions}
-					onstartSession={handleABStart}
-					onstopSession={handleABStop}
-				/>
+
+				<!-- Manual / Auto tabs -->
+				<div class="flex gap-1">
+					<Button
+						variant={advancedTab === 'manual' ? 'default' : 'outline'}
+						size="sm"
+						onclick={() => (advancedTab = 'manual')}
+					>
+						<FlaskConicalIcon class="size-3" aria-hidden="true" />
+						Manual A/B
+					</Button>
+					<Button
+						variant={advancedTab === 'auto' ? 'default' : 'outline'}
+						size="sm"
+						onclick={() => (advancedTab = 'auto')}
+					>
+						<WandIcon class="size-3" aria-hidden="true" />
+						Auto Optimize
+					</Button>
+				</div>
+
+				{#if advancedTab === 'manual'}
+					<ABTestingPanel
+						rows={wellData}
+						bind:sessionsData={abSessions}
+						onstartSession={handleABStart}
+						onstopSession={handleABStop}
+					/>
+				{:else}
+					<AutoOptimizer
+						bind:this={optimizerRef}
+						rows={wellData}
+						bind:running={optimizerRunning}
+						bind:results={optimizerResults}
+						onstartConfig={handleOptimizerStart}
+						onstopConfig={handleOptimizerStop}
+						onapplyConfig={handleApplyConfig}
+					/>
+				{/if}
 			</div>
 		{/if}
 	</main>
