@@ -578,7 +578,7 @@
 
 	<main class={cn(
 		'grid gap-4 overflow-hidden p-4',
-		advancedMode ? 'grid-cols-[3fr_2fr_2fr_2fr] grid-rows-1' : 'grid-cols-[2fr_1fr] grid-rows-1'
+		advancedMode ? 'grid-cols-[3fr_2fr_2fr_2fr] grid-rows-[minmax(0,1fr)]' : 'grid-cols-[2fr_1fr] grid-rows-[minmax(0,1fr)]'
 	)}>
 		<RigDashboard
 			rows={wellData}
