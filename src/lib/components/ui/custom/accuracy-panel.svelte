@@ -161,7 +161,7 @@
 	<ScrollArea class="min-h-0 flex-1">
 		<div class="flex flex-col gap-0.5 pr-3">
 			{#each [...evaluated].reverse().slice(0, 50) as e (e.id)}
-				<div class="grid grid-cols-[auto_auto_auto_1fr] items-center gap-2 px-1 py-0.5 font-mono text-[10px]">
+				<div class="grid grid-cols-[auto_auto_auto_auto] items-center gap-1 px-1 py-0.5 font-mono text-[8px]">
 					{#if e.skipped}
 						<span class="text-muted-foreground">?</span>
 					{:else if e.correct}
@@ -169,19 +169,16 @@
 					{:else}
 						<span class="text-atai-critical">✗</span>
 					{/if}
-					<Badge
-						variant="outline"
-						class={cn(
-							'w-24 justify-center text-[9px]',
-							e.label === 'DRILLING' ? 'bg-[#22d3ee]/20' : 'bg-[#f97316]/20'
-						)}
-					>
-						{e.label}
-					</Badge>
-					<span class="text-muted-foreground">
-						{e.groundTruth ? (e.groundTruth === e.label ? '=' : '≠') : '?'} {e.groundTruth ?? 'unknown'}
+					<span class={cn(
+						'truncate rounded-xs border px-1 py-0.5',
+						e.label === 'DRILLING' ? 'border-[#22d3ee]/30 text-[#22d3ee]' : 'border-[#f97316]/30 text-[#f97316]'
+					)}>
+						{e.label === 'DRILLING' ? 'DRILL' : 'NOT'}
 					</span>
-					<span class="text-muted-foreground text-right">W {e.windowStart}-{e.windowEnd}</span>
+					<span class="text-muted-foreground">
+						{e.groundTruth ? (e.groundTruth === e.label ? '=' : '≠') : '?'}{e.groundTruth === 'DRILLING' ? 'DRILL' : e.groundTruth === 'NOT_DRILLING' ? 'NOT' : '?'}
+					</span>
+					<span class="text-muted-foreground text-right">{e.windowStart}-{e.windowEnd}</span>
 				</div>
 			{/each}
 		</div>
