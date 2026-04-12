@@ -104,7 +104,7 @@
 	{...restProps}
 >
 	<p class="text-muted-foreground text-[10px]">
-		Volve oil field, North Sea (Equinor, 2007-2016) · Drilling rig surface sensors · Newton classifies each 25-sample window as drilling (bit cutting rock) or not drilling (tripping, circulating, shut-in)
+		Volve oil field, North Sea (Equinor, 2007-2016) · Drilling rig surface sensors · Newton classifies each 50-sample window as drilling (bit cutting rock) or not drilling (tripping, circulating, shut-in)
 	</p>
 	<div class="flex items-center gap-1">
 		<div class="flex flex-wrap gap-x-3 gap-y-1">

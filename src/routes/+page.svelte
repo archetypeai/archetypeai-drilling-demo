@@ -13,8 +13,8 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
-	const WINDOW_SIZE = 25;
-	const STEP_SIZE = 25;
+	const WINDOW_SIZE = 50;
+	const STEP_SIZE = 50;
 
 	const CHUNK_SIZE = 5000;
 
