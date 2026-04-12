@@ -82,7 +82,7 @@ async function waitForSession(sessionId, maxWaitMs = 60000) {
 }
 
 const WINDOW_SIZE = 64;
-const STEP_SIZE = 1;
+const STEP_SIZE = 64;
 const DATA_COLUMNS = ['BPOS', 'DBTM', 'FLWI', 'HDTH', 'HKLD', 'ROP', 'RPM', 'SPPA', 'WOB'];
 
 export async function createDrillingSession() {
