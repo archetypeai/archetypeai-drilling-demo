@@ -37,14 +37,16 @@
 				else actcCounts.UNKNOWN++;
 			}
 
-			// Majority vote for ground truth
+			// Only evaluate unanimous windows (all rows same label)
 			let groundTruth = null;
 			const total = actcCounts.DRILLING + actcCounts.NOT_DRILLING;
-			if (total > 0) {
-				groundTruth = actcCounts.DRILLING > actcCounts.NOT_DRILLING ? 'DRILLING' : 'NOT_DRILLING';
+			if (total > 0 && actcCounts.UNKNOWN === 0) {
+				if (actcCounts.DRILLING === total) groundTruth = 'DRILLING';
+				else if (actcCounts.NOT_DRILLING === total) groundTruth = 'NOT_DRILLING';
+				// else: mixed window → skip
 			}
 
-			const correct = groundTruth && cls.label === groundTruth;
+			const correct = groundTruth ? cls.label === groundTruth : null;
 			return { ...cls, groundTruth, correct, skipped: !groundTruth };
 		});
 	});
