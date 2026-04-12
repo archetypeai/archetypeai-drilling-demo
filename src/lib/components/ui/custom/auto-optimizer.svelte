@@ -140,6 +140,80 @@
 		running = false;
 		onstopConfig?.();
 	}
+
+	let roundNumber = $state(1);
+
+	function generateNextRound() {
+		// Take top 3 configs from current results
+		const sorted = [...results]
+			.filter((r) => r.status === 'done')
+			.sort((a, b) => (parseFloat(b.accuracy) || 0) - (parseFloat(a.accuracy) || 0));
+		const top = sorted.slice(0, 3).map((r) => r.config);
+		if (!top.length) return [];
+
+		const ALL_WINDOWS = [32, 48, 64, 96, 128, 192, 256];
+		const ALL_K = [3, 5, 7, 10, 15];
+		const ALL_METRICS = ['euclidean', 'manhattan', 'cosine'];
+		const ALL_WEIGHTS = ['uniform', 'distance'];
+
+		const tried = new Set(results.map((r) => configLabel(r.config)));
+		const candidates = [];
+
+		for (const base of top) {
+			// Vary one param at a time from the best configs
+			for (const ws of ALL_WINDOWS) {
+				const c = { ...base, windowSize: ws, stepSize: ws };
+				if (!tried.has(configLabel(c))) candidates.push(c);
+			}
+			for (const k of ALL_K) {
+				const c = { ...base, nNeighbors: k };
+				if (!tried.has(configLabel(c))) candidates.push(c);
+			}
+			for (const m of ALL_METRICS) {
+				const c = { ...base, metric: m };
+				if (!tried.has(configLabel(c))) candidates.push(c);
+			}
+			for (const w of ALL_WEIGHTS) {
+				const c = { ...base, weights: w };
+				if (!tried.has(configLabel(c))) candidates.push(c);
+			}
+		}
+
+		// Deduplicate and take 10
+		const seen = new Set();
+		const unique = [];
+		for (const c of candidates) {
+			const key = configLabel(c);
+			if (!seen.has(key)) {
+				seen.add(key);
+				unique.push(c);
+			}
+		}
+		return unique.slice(0, 10);
+	}
+
+	async function runNextRound() {
+		const nextConfigs = generateNextRound();
+		if (!nextConfigs.length) return;
+
+		roundNumber++;
+		running = true;
+
+		const newResults = nextConfigs.map((cfg) => ({
+			config: { ...cfg, stepSize: cfg.windowSize },
+			classifications: [],
+			accuracy: '--',
+			correct: 0,
+			total: 0,
+			status: 'pending'
+		}));
+
+		// Append to existing results
+		const prevLength = results.length;
+		results = [...results, ...newResults];
+		currentIdx = prevLength;
+		await runCurrentConfig();
+	}
 </script>
 
 <BackgroundCard
@@ -149,7 +223,7 @@
 	{...restProps}
 >
 	<p class="text-muted-foreground text-[10px]">
-		Tries {SEARCH_CONFIGS.length} configs ({windowsPerConfig} windows each), ranks by accuracy
+		{results.length > 0 ? `${results.length} configs tested` : `Tries 10 configs`} ({windowsPerConfig} windows each) · Round {roundNumber}
 	</p>
 
 	{#if !running && results.length === 0}
@@ -169,9 +243,12 @@
 				<Button variant="outline" size="sm" onclick={stopOptimization}>Stop</Button>
 			{:else}
 				<Badge variant="outline" class="bg-atai-good/20 font-mono text-[10px]">
-					Complete
+					R{roundNumber} done
 				</Badge>
-				<Button variant="outline" size="sm" onclick={startOptimization}>Re-run</Button>
+				<Button variant="outline" size="sm" onclick={runNextRound}>
+					Explore more
+				</Button>
+				<Button variant="ghost" size="sm" onclick={startOptimization}>Reset</Button>
 			{/if}
 		</div>
 

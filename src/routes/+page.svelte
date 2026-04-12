@@ -415,10 +415,11 @@
 					else if (raw && typeof raw === 'object') label = raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
 
 					if (label && optimizerRef) {
-						const idx = optimizerRef.results?.findIndex((r) => r.status === 'running') ?? -1;
+						// Find the running config in the bound results
+						const idx = optimizerResults.findIndex((r) => r.status === 'running');
 						if (idx >= 0) {
-							const stepSize = optimizerRef.results[idx].config.windowSize;
-							const windowIdx = optimizerRef.results[idx].classifications.length;
+							const stepSize = optimizerResults[idx].config.windowSize;
+							const windowIdx = optimizerResults[idx].classifications.length;
 							optimizerRef.receiveClassification(
 								String(label),
 								windowIdx * stepSize,
@@ -430,12 +431,17 @@
 			} catch {}
 		};
 
+		// Wait for SSE connection to establish and n-shot processing
+		await new Promise((r) => setTimeout(r, 3000));
+
 		// Stream windows for this config
 		const windowSize = config.windowSize;
 		for (let i = 0; i < 20 && i * windowSize + windowSize <= wellData.length; i++) {
 			const start = i * windowSize;
 			const windowRows = wellData.slice(start, start + windowSize);
 			await streamWindowToNewton(result.sessionId, windowRows);
+			// Small delay between windows to let Newton process
+			await new Promise((r) => setTimeout(r, 200));
 		}
 	}
 
