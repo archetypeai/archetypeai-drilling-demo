@@ -2,6 +2,7 @@
 	import { cn } from '$lib/utils.js';
 	import Badge from '$lib/components/ui/primitives/badge/index.js';
 	import { Button } from '$lib/components/ui/primitives/button/index.js';
+	import SpinnerIcon from '@lucide/svelte/icons/loader';
 
 	let {
 		label = 'A',
@@ -35,6 +36,8 @@
 			</span>
 			{#if accuracy !== null}
 				<span class="font-mono text-sm" style="color: {color};">{accuracy}%</span>
+			{:else if running}
+				<SpinnerIcon class="size-3 animate-spin" style="color: {color};" />
 			{/if}
 		</div>
 		{#if running}

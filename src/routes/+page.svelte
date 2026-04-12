@@ -366,13 +366,16 @@
 				} catch {}
 			};
 
-			// Pre-stream first few windows
+			// Wait for n-shot processing then pre-stream windows
+			await new Promise((r) => setTimeout(r, 3000));
+
 			if (wellData.length >= config.windowSize) {
-				for (let i = 0; i < 5 && i * config.windowSize < wellData.length; i++) {
+				for (let i = 0; i < 10 && (i + 1) * config.windowSize <= wellData.length; i++) {
 					const start = i * config.windowSize;
 					const windowRows = wellData.slice(start, start + config.windowSize);
 					await streamWindowToNewton(result.sessionId, windowRows);
 					if (abSessions[slot]) abSessions[slot].streamCounter = i + 1;
+					await new Promise((r) => setTimeout(r, 200));
 				}
 			}
 		} catch (err) {
