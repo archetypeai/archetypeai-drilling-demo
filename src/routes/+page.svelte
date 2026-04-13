@@ -401,7 +401,12 @@
 		optimizerSession = result.sessionId;
 
 		const sseProxyUrl = `/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`;
-		optimizerSseSource = connectSSE(sseProxyUrl, (label) => {
+		const es = new EventSource(sseProxyUrl);
+		optimizerSseSource = es;
+
+		es.onmessage = (event) => {
+			const label = parseSSELabel(event);
+			if (!label) return;
 			console.log('[OPTIMIZER SSE] received:', label);
 			const idx = optimizerResults.findIndex((r) => r.status === 'running');
 			if (idx >= 0 && optimizerRef) {
@@ -413,12 +418,32 @@
 					(windowIdx + 1) * stepSize
 				);
 			} else {
-				console.warn('[OPTIMIZER SSE] no running config found, idx:', idx, 'ref:', !!optimizerRef);
+				console.warn('[OPTIMIZER SSE] no running config, idx:', idx);
 			}
-		});
+		};
 
-		// Wait for SSE connection to establish and n-shot processing
-		await new Promise((r) => setTimeout(r, 3000));
+		es.onopen = () => {
+			console.log('[OPTIMIZER SSE] connection opened');
+		};
+
+		es.onerror = (e) => {
+			console.warn('[OPTIMIZER SSE] error, readyState:', es.readyState);
+		};
+
+		// Wait for SSE connection to open and n-shot processing to complete
+		console.log('[OPTIMIZER] waiting for SSE + n-shot processing...');
+		await new Promise((resolve) => {
+			const check = setInterval(() => {
+				if (es.readyState === EventSource.OPEN) {
+					clearInterval(check);
+					// Extra time for n-shot processing
+					setTimeout(resolve, 5000);
+				}
+			}, 500);
+			// Fallback: proceed after 30s even if not open
+			setTimeout(() => { clearInterval(check); resolve(); }, 30000);
+		});
+		console.log('[OPTIMIZER] SSE ready, streaming windows...');
 
 		// Stream windows for this config
 		const windowSize = config.windowSize;
