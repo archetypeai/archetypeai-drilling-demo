@@ -15,8 +15,8 @@
 
 	// Mirrors src/lib/server/newton.js DEFAULT_CONFIG; used for display in Live Evaluation.
 	const DEFAULT_CONFIG = {
-		windowSize: 32,
-		stepSize: 32,
+		windowSize: 128,
+		stepSize: 128,
 		nShotPerClass: 2000,
 		nNeighbors: 3,
 		metric: 'euclidean',

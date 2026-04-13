@@ -13,7 +13,7 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 - **14 wells** from the Volve North Sea oil field, sorted by drilling activity percentage
 - **Rig instrument panel** — SVG drilling rig with 10 live sensor sparklines (9 channels + ACTC ground truth)
 - **Playback controls** — play, pause, reset with progress bar, human-friendly timestamps
-- **Machine State classification** — Newton classifies each 64-sample window as drilling or not_drilling
+- **Machine State classification** — Newton classifies each 128-sample window as drilling or not_drilling
 - **Classification log** — scrolling list of predictions with drilling/not-drilling counts
 - **N-shot learning** — 2,000 labeled examples per class (from batch repo, seed 42) uploaded to Newton for KNN
 - **SSE streaming** — results arrive in real-time as windows are processed
@@ -27,11 +27,15 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 
 Hyperparameter search lives in a separate tool: [archetypeai/newton-streaming-optimizer](https://github.com/archetypeai/newton-streaming-optimizer) brute-forces a grid of window sizes / KNN params against the streaming API and outputs a ready-to-use config JSON. Drop the winning values into `DEFAULT_CONFIG` in `src/lib/server/newton.js` to apply them here.
 
-The current default (`window=32, k=3, euclidean, uniform`) is the most-confirmed config from optimizer runs (multiple ties at this point, all reproducible). Re-run the optimizer against your own data if you want a different sensor set or balance.
+The current default (`window=128, k=3, euclidean, uniform`) is the optimizer's top-ranked config on the bundled drilling slice. F1 climbed monotonically with window size: w32=85.4% → w64=97.1% → w128=100%. Re-run the optimizer against your own data if you want a different sensor set or balance.
 
 ## Notes on the Streaming Encoder
 
-The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). On the optimizer's balanced 200K-row drilling slice, the tuned w32 config reaches **macro F1 ≈ 85%** (drilling P=98.5% / R=85.5%, not_drilling P=67.6% / R=95.8%). Per-well numbers in the demo will vary — wells with little or no drilling activity will inevitably show different metrics. The batch pipeline's `omega_1_3_surface` (domain-specific surface drilling encoder) is not yet available for the streaming/lens API.
+The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). On the optimizer's balanced 200K-row drilling slice, the tuned w128 config reaches **macro F1 = 100%** (drilling P=100% / R=100%, not_drilling P=100% / R=100% across 99 unanimous test windows).
+
+> **Caveat on the headline number:** that's an in-distribution evaluation (n-shot examples and test slice both come from the same Volve dataset) on the most-balanced section the optimizer could find, scored only on unanimous windows. Realistically expect **85-95% per-well in the demo**, varying by well: wells with substantive drilling activity (F-12, F-14, F-4, F-5, F-9) will score in the 90s; wells with little or no drilling will fail trivially because there's nothing to classify *as* drilling.
+
+The batch pipeline's `omega_1_3_surface` (domain-specific surface drilling encoder) achieves higher accuracy on the broader drilling distribution but is not yet available for the streaming/lens API.
 
 ## Stack
 
@@ -85,7 +89,7 @@ Open `http://localhost:5173`, select a well, click **Start Analysis**, then pres
 1. Select a well — data loads incrementally from full raw CSVs (up to 1.9M rows per well)
 2. **Start Analysis** uploads n-shot CSV files (2,000 drilling + 2,000 not_drilling), creates a Machine State Lens session, and connects SSE
 3. Press **Play** — data plays back at accelerated speed, advancing the rig sparklines and playhead
-4. As the playhead passes each 64-sample window boundary, the window is streamed to Newton
+4. As the playhead passes each 128-sample window boundary, the window is streamed to Newton
 5. Newton computes OmegaEncoder embeddings, runs KNN against n-shot examples, returns classification via SSE
 6. Results appear as colored bands on the rig and entries in the classification log
 
@@ -135,12 +139,12 @@ Optimized via [newton-streaming-optimizer](https://github.com/archetypeai/newton
   "model_name": "OmegaEncoder",
   "model_version": "OmegaEncoder::omega_embeddings_01",
   "normalize_input": true,
-  "buffer_size": 32,
+  "buffer_size": 128,
   "csv_configs": {
     "timestamp_column": "DATE_TIME",
     "data_columns": ["BPOS", "DBTM", "FLWI", "HDTH", "HKLD", "ROP", "RPM", "SPPA", "WOB"],
-    "window_size": 32,
-    "step_size": 32
+    "window_size": 128,
+    "step_size": 128
   },
   "knn_configs": {
     "n_neighbors": 3,

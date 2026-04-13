@@ -81,15 +81,15 @@ async function waitForSession(sessionId, maxWaitMs = 60000) {
 	return false;
 }
 
-// Optimized via newton-streaming-optimizer:
-// w32 k3 euclidean uniform → F1≈85.4% Acc≈88.0% on examples/drilling/inference.csv
-// (3-way tie with k3-dist and k5-unif, all reproducible across multiple runs).
-// w64 k3 manhattan distance hit F1=93% in one run but the result wasn't
-// reproducible — most w64+ configs returned no predictions, so that 93% was
-// almost certainly an SSE timing artifact. Sticking with the reliable w32 baseline.
+// Optimized via newton-streaming-optimizer (full grid, post-warmup-fix):
+// w128 k3 euclidean uniform → F1=100.0% Acc=100.0% on examples/drilling/inference.csv
+// (drilling: P=100% R=100% / not_drilling: P=100% R=100%, 99 unanimous windows).
+// Larger windows monotonically improve embeddings here: w32=85.4% → w64=97.1% → w128=100%.
+// Per-well numbers in the demo will vary; expect 85-95% on wells with
+// substantive drilling activity, lower on wells with little drilling.
 const DEFAULT_CONFIG = {
-	windowSize: 32,
-	stepSize: 32,
+	windowSize: 128,
+	stepSize: 128,
 	nNeighbors: 3,
 	metric: 'euclidean',
 	weights: 'uniform',
