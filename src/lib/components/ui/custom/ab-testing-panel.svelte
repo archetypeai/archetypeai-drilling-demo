@@ -112,7 +112,7 @@
 	class={cn('flex max-h-full flex-col gap-3 overflow-hidden', className)}
 	{...restProps}
 >
-	<div class="grid grid-cols-2 gap-2">
+	<div class="flex flex-col gap-2">
 		<ConfigEditor
 			label="A"
 			color="#22d3ee"

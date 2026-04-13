@@ -53,7 +53,7 @@
 		</div>
 	</div>
 
-	<div class="grid grid-cols-2 gap-x-3 gap-y-1">
+	<div class="grid grid-cols-4 gap-x-2 gap-y-1">
 		<label class="text-muted-foreground text-[10px]">
 			Window
 			<select
