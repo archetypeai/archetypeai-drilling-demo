@@ -7,16 +7,11 @@
 	import RigDashboard from '$lib/components/ui/custom/rig-dashboard.svelte';
 	import ClassificationLog from '$lib/components/ui/custom/classification-log.svelte';
 	import AccuracyPanel from '$lib/components/ui/custom/accuracy-panel.svelte';
-	import ABTestingPanel from '$lib/components/ui/custom/ab-testing-panel.svelte';
-	import AutoOptimizer from '$lib/components/ui/custom/auto-optimizer.svelte';
-	import ConfirmModal from '$lib/components/ui/custom/confirm-modal.svelte';
 	import PlaybackControls from '$lib/components/ui/custom/playback-controls.svelte';
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import SpinnerIcon from '@lucide/svelte/icons/loader';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import WandIcon from '@lucide/svelte/icons/wand-sparkles';
-	import FlaskConicalIcon from '@lucide/svelte/icons/flask-conical';
-	import { fetchWells, fetchWellChunk, fetchMixedOffset, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
+	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
 	const DEFAULT_CONFIG = {
 		windowSize: 64,
@@ -26,27 +21,9 @@
 		metric: 'euclidean',
 		algorithm: 'ball_tree'
 	};
-	const CONFIG_KEY = 'newton-drilling-config';
 
-	function loadSavedConfig() {
-		if (typeof localStorage === 'undefined') return { ...DEFAULT_CONFIG };
-		try {
-			const saved = localStorage.getItem(CONFIG_KEY);
-			if (saved) return { ...DEFAULT_CONFIG, ...JSON.parse(saved), saved: true };
-		} catch {}
-		return { ...DEFAULT_CONFIG };
-	}
-
-	function saveConfig(config) {
-		if (typeof localStorage === 'undefined') return;
-		try {
-			localStorage.setItem(CONFIG_KEY, JSON.stringify(config));
-		} catch {}
-	}
-
-	const savedConfig = loadSavedConfig();
-	const WINDOW_SIZE = savedConfig.windowSize;
-	const STEP_SIZE = savedConfig.stepSize;
+	const WINDOW_SIZE = DEFAULT_CONFIG.windowSize;
+	const STEP_SIZE = DEFAULT_CONFIG.stepSize;
 
 	const CHUNK_SIZE = 5000;
 
@@ -62,32 +39,15 @@
 
 	let sessionId = $state(null);
 	let sseUrl = $state(null);
-	let apiKey = $state(null);
 	let sessionStatus = $state('idle');
 	let setupStep = $state('');
 	let advancedMode = $state(false);
 
-	let currentConfig = $state({ ...savedConfig });
-
-	// Config apply modal
-	let showApplyModal = $state(false);
-	let pendingConfig = $state(null);
 	let classifications = $state([]);
 	let streamCounter = $state(0);
 	let expanded = $state(null);
 
 	let sseSource = $state(null);
-
-	// A/B testing state
-	let abSessions = $state({ a: null, b: null });
-
-	// Optimizer state
-	let advancedTab = $state('manual'); // 'manual' | 'auto'
-	let optimizerRunning = $state(false);
-	let optimizerResults = $state([]);
-	let optimizerRef = $state(null);
-	let optimizerSession = $state(null);
-	let optimizerSseSource = $state(null);
 
 	async function loadWells() {
 		try {
@@ -137,7 +97,6 @@
 	async function handleStart() {
 		// Reuse existing session if available
 		if (sessionId) {
-			// Just reset playback state for the new well
 			classifications = [];
 			streamCounter = 0;
 			return;
@@ -152,7 +111,6 @@
 			});
 			sessionId = result.sessionId;
 			sseUrl = result.sseUrl;
-			apiKey = result.apiKey;
 			sessionStatus = 'active';
 			setupStep = '';
 
@@ -176,7 +134,9 @@
 				if (Array.isArray(raw)) return raw[0];
 				if (raw && typeof raw === 'object') return raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
 			}
-		} catch {}
+		} catch {
+			// ignore parse errors
+		}
 		return null;
 	}
 
@@ -195,7 +155,6 @@
 			if (reconnectAttempts > 5) {
 				console.warn('SSE reconnect limit reached, closing');
 				es.close();
-				// Try a fresh connection after a delay
 				setTimeout(() => {
 					if (sessionId) {
 						console.log('Attempting SSE reconnect...');
@@ -228,7 +187,6 @@
 	}
 
 	async function preStreamWindows(count) {
-		// Wait for well data to be available
 		let waited = 0;
 		while (wellData.length < WINDOW_SIZE && waited < 10000) {
 			await new Promise((r) => setTimeout(r, 200));
@@ -266,16 +224,13 @@
 		if (!wellData.length) return;
 		playing = true;
 
-		// Advance playhead and stream windows
 		playInterval = setInterval(() => {
 			if (playheadIndex < wellData.length - 1) {
 				playheadIndex = Math.min(playheadIndex + 20, wellData.length - 1);
 			}
 
-			// Load more data when approaching the end of loaded rows
 			maybeLoadMore();
 
-			// Stream windows to keep up with playhead
 			if (sessionId) {
 				const nextWindowStart = streamCounter * STEP_SIZE;
 				if (playheadIndex >= nextWindowStart) {
@@ -283,10 +238,6 @@
 				}
 			}
 
-			// Stream to A/B test sessions
-			streamToABSessions();
-
-			// Only stop if we've reached the end of ALL data (not just loaded data)
 			if (playheadIndex >= wellData.length - 1 && loadedOffset >= wellTotal) {
 				playing = false;
 				clearInterval(playInterval);
@@ -322,313 +273,8 @@
 		sessionStatus = 'idle';
 	}
 
-	function findMixedOffset(windowSize, numWindows = 41) {
-		const scanSize = numWindows * windowSize;
-		let bestOffset = 0;
-		let bestMix = 0;
-		for (let offset = 0; offset + scanSize <= wellData.length; offset += windowSize * 10) {
-			const section = wellData.slice(offset, offset + scanSize);
-			let drilling = 0, notDrilling = 0;
-			for (const row of section) {
-				const actc = row?.ACTC?.trim();
-				if (actc === '1' || actc === '2') drilling++;
-				else if (actc === '3' || actc === '4' || actc === '8' || actc === '9') notDrilling++;
-			}
-			const total = drilling + notDrilling;
-			if (total === 0) continue;
-			const mix = Math.min(drilling, notDrilling) / total;
-			if (mix > bestMix) { bestMix = mix; bestOffset = offset; }
-		}
-		return { offset: bestOffset, mix: bestMix };
-	}
-
 	function toggleExpand(panel) {
 		expanded = expanded === panel ? null : panel;
-	}
-
-	// A/B testing: start a session with specific config
-	async function handleABStart(slot, config) {
-		try {
-			const result = await startSession(() => {}, config);
-			const sseUrl = `/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`;
-
-			abSessions = {
-				...abSessions,
-				[slot]: {
-					sessionId: result.sessionId,
-					sseUrl: result.sseUrl,
-					sseSource: null,
-					config,
-					classifications: [],
-					streamCounter: 0
-				}
-			};
-
-			const sseEs = connectSSE(sseUrl, (label) => {
-				if (abSessions[slot]) {
-					const windowIdx = abSessions[slot].classifications.length;
-					const stepSize = config.windowSize;
-					abSessions[slot].classifications = [
-						...abSessions[slot].classifications,
-						{
-							id: crypto.randomUUID(),
-							label,
-							windowStart: windowIdx * stepSize,
-							windowEnd: (windowIdx + 1) * stepSize
-						}
-					];
-					abSessions = { ...abSessions };
-				}
-			});
-			abSessions[slot].sseSource = sseEs;
-
-			// Find mixed data section from full well (server-side)
-			const abMixed = selectedWell ? await fetchMixedOffset(selectedWell.id, config.windowSize, 11) : { offset: 0, mix: 0 };
-			console.log(`[A/B ${slot}] data offset: ${abMixed.offset} (mix: ${abMixed.mix}%)`);
-
-			let abData;
-			try {
-				const chunk = await fetchWellChunk(selectedWell.id, abMixed.offset, 11 * config.windowSize);
-				abData = chunk.rows;
-			} catch {
-				abData = wellData;
-			}
-
-			await new Promise((r) => setTimeout(r, 3000));
-
-			if (abData.length >= config.windowSize) {
-				for (let i = 0; i < 10 && (i + 1) * config.windowSize <= abData.length; i++) {
-					const start = i * config.windowSize;
-					const windowRows = abData.slice(start, start + config.windowSize);
-					await streamWindowToNewton(result.sessionId, windowRows);
-					if (abSessions[slot]) abSessions[slot].streamCounter = i + 1;
-					await new Promise((r) => setTimeout(r, 200));
-				}
-			}
-		} catch (err) {
-			console.error(`A/B session ${slot} failed:`, err);
-		}
-	}
-
-	async function handleABStop(slot) {
-		const session = abSessions[slot];
-		if (!session) return;
-		if (session.sseSource) session.sseSource.close();
-		if (session.sessionId) {
-			try { await endSession(session.sessionId); } catch {}
-		}
-		abSessions = { ...abSessions, [slot]: null };
-	}
-
-	// Auto optimizer: start a config
-	async function handleOptimizerStart(config) {
-		// Clean up previous optimizer session
-		if (optimizerSseSource) optimizerSseSource.close();
-		if (optimizerSession) {
-			try { await endSession(optimizerSession); } catch {}
-		}
-
-		const result = await startSession(() => {}, config);
-		optimizerSession = result.sessionId;
-		console.log('[OPTIMIZER] session:', result.sessionId, 'sseUrl:', result.sseUrl);
-		console.log('[OPTIMIZER] main session:', sessionId, 'main sseUrl:', sseUrl);
-
-		const sseProxyUrl = `/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`;
-		const es = new EventSource(sseProxyUrl);
-		optimizerSseSource = es;
-
-		es.onmessage = (event) => {
-			const label = parseSSELabel(event);
-			if (!label) return;
-			console.log('[OPTIMIZER SSE] received:', label);
-			const idx = optimizerResults.findIndex((r) => r.status === 'running');
-			if (idx >= 0 && optimizerRef) {
-				const stepSize = optimizerResults[idx].config.windowSize;
-				const windowIdx = optimizerResults[idx].classifications.length;
-				optimizerRef.receiveClassification(
-					label,
-					windowIdx * stepSize,
-					(windowIdx + 1) * stepSize
-				);
-			} else {
-				console.warn('[OPTIMIZER SSE] no running config, idx:', idx);
-			}
-		};
-
-		es.onopen = () => {
-			console.log('[OPTIMIZER SSE] connection opened');
-		};
-
-		es.onerror = (e) => {
-			console.warn('[OPTIMIZER SSE] error, readyState:', es.readyState);
-		};
-
-		// Wait for SSE connection to open and n-shot processing to complete
-		console.log('[OPTIMIZER] waiting for SSE + n-shot processing...');
-		await new Promise((resolve) => {
-			const check = setInterval(() => {
-				if (es.readyState === EventSource.OPEN) {
-					clearInterval(check);
-					// Extra time for n-shot processing
-					setTimeout(resolve, 5000);
-				}
-			}, 500);
-			// Fallback: proceed after 30s even if not open
-			setTimeout(() => { clearInterval(check); resolve(); }, 30000);
-		});
-		// Find a section with mixed drilling/not-drilling from full well data (server-side)
-		const windowSize = config.windowSize;
-		const mixedResult = selectedWell ? await fetchMixedOffset(selectedWell.id, windowSize) : { offset: 0, mix: 0 };
-		const bestOffset = mixedResult.offset;
-		console.log(`[OPTIMIZER] data offset: ${bestOffset} (mix: ${mixedResult.mix}% minority class, total: ${mixedResult.totalRows} rows)`);
-
-		// Load the data chunk we need for streaming
-		const neededRows = (41) * windowSize;
-		let optimizerData;
-		try {
-			const chunk = await fetchWellChunk(selectedWell.id, bestOffset, neededRows);
-			optimizerData = chunk.rows;
-			console.log(`[OPTIMIZER] loaded ${optimizerData.length} rows from offset ${bestOffset}`);
-		} catch {
-			optimizerData = wellData;
-			console.warn('[OPTIMIZER] failed to load chunk, using client data');
-		}
-
-		// Track when first result arrives (warm-up complete)
-		let firstResultReceived = false;
-		const origOnMessage = es.onmessage;
-		es.onmessage = (event) => {
-			if (!firstResultReceived) {
-				firstResultReceived = true;
-				console.log('[OPTIMIZER] warm-up complete, first result received');
-			}
-			origOnMessage?.(event);
-		};
-
-		// Send probe window and wait for Newton to be ready
-		console.log('[OPTIMIZER] sending probe window...');
-		if (optimizerData.length >= windowSize) {
-			await streamWindowToNewton(result.sessionId, optimizerData.slice(0, windowSize));
-		}
-
-		// Wait up to 90s for first result
-		const warmupStart = Date.now();
-		while (!firstResultReceived && Date.now() - warmupStart < 90000 && optimizerSession) {
-			await new Promise((r) => setTimeout(r, 500));
-		}
-
-		if (!firstResultReceived) {
-			console.warn('[OPTIMIZER] warm-up timed out after 90s, streaming anyway...');
-		}
-
-		// Stream 40 inference windows from the mixed section
-		// Log ground truth distribution across windows
-		let gtDrilling = 0, gtNotDrilling = 0, gtMixed = 0;
-		for (let i = 0; i <= 40 && (i + 1) * windowSize <= optimizerData.length; i++) {
-			const start = i * windowSize;
-			const windowRows = optimizerData.slice(start, start + windowSize);
-			let d = 0, n = 0;
-			for (const row of windowRows) {
-				const actc = row?.ACTC?.trim();
-				if (actc === '1' || actc === '2') d++;
-				else if (actc === '3' || actc === '4' || actc === '8' || actc === '9') n++;
-			}
-			if (d > 0 && n === 0) gtDrilling++;
-			else if (n > 0 && d === 0) gtNotDrilling++;
-			else gtMixed++;
-		}
-		console.log(`[OPTIMIZER] window ground truth: ${gtDrilling} drilling, ${gtNotDrilling} not-drilling, ${gtMixed} mixed`);
-
-		console.log('[OPTIMIZER] streaming 40 inference windows...');
-		for (let i = 1; i <= 40 && (i + 1) * windowSize <= optimizerData.length; i++) {
-			if (!optimizerSession) break;
-			const start = i * windowSize;
-			const windowRows = optimizerData.slice(start, start + windowSize);
-			await streamWindowToNewton(result.sessionId, windowRows);
-			await new Promise((r) => setTimeout(r, 1000));
-		}
-		console.log('[OPTIMIZER] all windows streamed, waiting for results...');
-	}
-
-	async function handleOptimizerStop() {
-		if (optimizerSseSource) { optimizerSseSource.close(); optimizerSseSource = null; }
-		if (optimizerSession) {
-			try { await endSession(optimizerSession); } catch {}
-			optimizerSession = null;
-		}
-		// Reconnect main SSE if session is still active
-		if (sessionId && sseUrl && !sseSource) {
-			console.log('[OPTIMIZER] reconnecting main SSE');
-			startSSE();
-		}
-	}
-
-	function handleApplyConfig(config) {
-		pendingConfig = { ...config, stepSize: config.stepSize || config.windowSize };
-		showApplyModal = true;
-	}
-
-	async function confirmApplyConfig() {
-		if (!pendingConfig) return;
-
-		// Stop current main session
-		await handleStop();
-
-		// Update config and persist to localStorage
-		currentConfig = {
-			...currentConfig,
-			windowSize: pendingConfig.windowSize,
-			stepSize: pendingConfig.stepSize,
-			nNeighbors: pendingConfig.nNeighbors,
-			metric: pendingConfig.metric,
-			weights: pendingConfig.weights || 'uniform',
-			algorithm: pendingConfig.algorithm || 'ball_tree'
-		};
-		saveConfig(currentConfig);
-
-		// Reset state
-		classifications = [];
-		streamCounter = 0;
-		playheadIndex = 0;
-
-		// Start new session with the applied config
-		sessionStatus = 'connecting';
-		setupStep = 'Applying new config...';
-
-		try {
-			const result = await startSession((step) => { setupStep = step; }, pendingConfig);
-			sessionId = result.sessionId;
-			sseUrl = result.sseUrl;
-			apiKey = result.apiKey;
-			sessionStatus = 'active';
-			setupStep = '';
-			startSSE();
-			preStreamWindows(5);
-
-			// Auto-play after applying config
-			handlePlay();
-		} catch (err) {
-			console.error('Session failed:', err);
-			sessionStatus = 'error';
-			setupStep = '';
-		}
-
-		pendingConfig = null;
-	}
-
-	// Stream data to A/B sessions during playback
-	function streamToABSessions() {
-		for (const slot of ['a', 'b']) {
-			const session = abSessions[slot];
-			if (!session?.sessionId) continue;
-			const stepSize = session.config.windowSize;
-			const nextStart = session.streamCounter * stepSize;
-			if (playheadIndex >= nextStart && nextStart + stepSize <= wellData.length) {
-				const windowRows = wellData.slice(nextStart, nextStart + stepSize);
-				streamWindowToNewton(session.sessionId, windowRows);
-				session.streamCounter++;
-			}
-		}
 	}
 
 	$effect(() => {
@@ -697,7 +343,7 @@
 
 	<main class={cn(
 		'grid gap-4 overflow-hidden p-4',
-		advancedMode ? 'grid-cols-[3fr_2fr_2fr_2fr] grid-rows-[minmax(0,1fr)]' : 'grid-cols-[2fr_1fr] grid-rows-[minmax(0,1fr)]'
+		advancedMode ? 'grid-cols-[3fr_1fr_2fr] grid-rows-[minmax(0,1fr)]' : 'grid-cols-[2fr_1fr] grid-rows-[minmax(0,1fr)]'
 	)}>
 		<RigDashboard
 			rows={wellData}
@@ -716,53 +362,8 @@
 				<AccuracyPanel
 					{classifications}
 					rows={wellData}
-					windowSize={WINDOW_SIZE}
-					stepSize={STEP_SIZE}
-					config={currentConfig}
+					config={DEFAULT_CONFIG}
 				/>
-			</div>
-
-			<div class="flex h-full min-h-0 flex-col gap-3 overflow-y-auto">
-				<div class="flex gap-1">
-					<Button
-						variant={advancedTab === 'manual' ? 'default' : 'outline'}
-						size="sm"
-						onclick={() => (advancedTab = 'manual')}
-					>
-						<FlaskConicalIcon class="size-3" aria-hidden="true" />
-						Manual A/B
-					</Button>
-					<Button
-						variant={advancedTab === 'auto' ? 'default' : 'outline'}
-						size="sm"
-						onclick={() => (advancedTab = 'auto')}
-					>
-						<WandIcon class="size-3" aria-hidden="true" />
-						Auto Optimize
-					</Button>
-				</div>
-
-				{#if advancedTab === 'manual'}
-					<ABTestingPanel
-						rows={wellData}
-						bind:sessionsData={abSessions}
-						onstartSession={handleABStart}
-						onstopSession={handleABStop}
-						onapplyConfig={handleApplyConfig}
-						class="min-h-0 flex-1"
-					/>
-				{:else}
-					<AutoOptimizer
-						bind:this={optimizerRef}
-						rows={wellData}
-						bind:running={optimizerRunning}
-						bind:results={optimizerResults}
-						onstartConfig={handleOptimizerStart}
-						onstopConfig={handleOptimizerStop}
-						onapplyConfig={handleApplyConfig}
-						class="min-h-0 flex-1"
-					/>
-				{/if}
 			</div>
 		{/if}
 	</main>
@@ -787,39 +388,6 @@
 				wellIndex={wells.findIndex((w) => w.id === selectedWell?.id)}
 				class="h-full"
 			/>
-		</div>
-	</div>
-{/if}
-
-<!-- Apply config confirmation modal (inline to avoid grid containment) -->
-{#if showApplyModal && pendingConfig}
-	<div
-		style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);"
-		onclick={(e) => { if (e.target === e.currentTarget) showApplyModal = false; }}
-		onkeydown={(e) => { if (e.key === 'Escape') showApplyModal = false; }}
-		role="dialog"
-		aria-modal="true"
-		tabindex="-1"
-	>
-		<div style="background:var(--card);border:1px solid var(--border);border-radius:2px;padding:24px;width:420px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-			<h3 class="text-foreground mb-4 font-mono text-base uppercase tracking-wider">Apply Config</h3>
-			<p class="text-foreground mb-3 text-sm">
-				This will stop the current session and restart with the new config:
-			</p>
-			<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 16px;font-family:var(--font-mono);font-size:14px;margin-bottom:16px;">
-				<span class="text-muted-foreground">Window size</span><span class="text-foreground">{pendingConfig.windowSize}</span>
-				<span class="text-muted-foreground">Step size</span><span class="text-foreground">{pendingConfig.stepSize || pendingConfig.windowSize}</span>
-				<span class="text-muted-foreground">K neighbors</span><span class="text-foreground">{pendingConfig.nNeighbors}</span>
-				<span class="text-muted-foreground">Metric</span><span class="text-foreground">{pendingConfig.metric}</span>
-				<span class="text-muted-foreground">Weights</span><span class="text-foreground">{pendingConfig.weights}</span>
-			</div>
-			<p class="text-muted-foreground mb-4 text-xs">
-				Playback will reset. Classification history will be cleared. Config will be saved for next app load.
-			</p>
-			<div class="flex justify-end gap-2">
-				<Button variant="outline" size="sm" onclick={() => (showApplyModal = false)}>Cancel</Button>
-				<Button variant="default" size="sm" onclick={() => { showApplyModal = false; confirmApplyConfig(); }}>Apply & Restart</Button>
-			</div>
 		</div>
 	</div>
 {/if}
