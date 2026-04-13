@@ -468,13 +468,13 @@
 
 		// Wait up to 60s for first result
 		const warmupStart = Date.now();
-		while (!warmedUp && Date.now() - warmupStart < 60000 && optimizerSession) {
+		while (!warmedUp && Date.now() - warmupStart < 90000 && optimizerSession) {
 			await new Promise((r) => setTimeout(r, 500));
 		}
 		es.removeEventListener('message', warmupHandler);
 
 		if (!warmedUp) {
-			console.warn('[OPTIMIZER] warm-up timed out after 60s');
+			console.warn('[OPTIMIZER] warm-up timed out after 90s');
 		}
 
 		// Now stream 20 windows that should all produce results
