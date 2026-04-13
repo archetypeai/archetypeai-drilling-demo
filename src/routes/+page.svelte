@@ -400,35 +400,22 @@
 		const result = await startSession(() => {}, config);
 		optimizerSession = result.sessionId;
 
-		const es = new EventSource(`/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`);
-		optimizerSseSource = es;
-
-		es.onmessage = (event) => {
-			try {
-				const parsed = JSON.parse(event.data);
-				if (parsed.type === 'inference.result') {
-					const raw = parsed.event_data?.response;
-					let label = '';
-					if (typeof raw === 'string') label = raw;
-					else if (Array.isArray(raw)) label = raw[0];
-					else if (raw && typeof raw === 'object') label = raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
-
-					if (label && optimizerRef) {
-						// Find the running config in the bound results
-						const idx = optimizerResults.findIndex((r) => r.status === 'running');
-						if (idx >= 0) {
-							const stepSize = optimizerResults[idx].config.windowSize;
-							const windowIdx = optimizerResults[idx].classifications.length;
-							optimizerRef.receiveClassification(
-								String(label),
-								windowIdx * stepSize,
-								(windowIdx + 1) * stepSize
-							);
-						}
-					}
-				}
-			} catch {}
-		};
+		const sseProxyUrl = `/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`;
+		optimizerSseSource = connectSSE(sseProxyUrl, (label) => {
+			console.log('[OPTIMIZER SSE] received:', label);
+			const idx = optimizerResults.findIndex((r) => r.status === 'running');
+			if (idx >= 0 && optimizerRef) {
+				const stepSize = optimizerResults[idx].config.windowSize;
+				const windowIdx = optimizerResults[idx].classifications.length;
+				optimizerRef.receiveClassification(
+					label,
+					windowIdx * stepSize,
+					(windowIdx + 1) * stepSize
+				);
+			} else {
+				console.warn('[OPTIMIZER SSE] no running config found, idx:', idx, 'ref:', !!optimizerRef);
+			}
+		});
 
 		// Wait for SSE connection to establish and n-shot processing
 		await new Promise((r) => setTimeout(r, 3000));
