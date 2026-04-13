@@ -472,7 +472,7 @@
 
 		// Now stream 20 windows that should all produce results
 		console.log('[OPTIMIZER] streaming 20 inference windows...');
-		for (let i = 1; i <= 20 && (i + 1) * windowSize <= wellData.length; i++) {
+		for (let i = 1; i <= 40 && (i + 1) * windowSize <= wellData.length; i++) {
 			if (!optimizerSession) break;
 			const start = i * windowSize;
 			const windowRows = wellData.slice(start, start + windowSize);

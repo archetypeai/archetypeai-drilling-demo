@@ -41,7 +41,7 @@
 
 	let currentIdx = $state(-1);
 	let currentSession = $state(null);
-	let windowsPerConfig = 20;
+	let windowsPerConfig = 40;
 
 	function computeMetrics(classifications, windowSize) {
 		let tp = 0, fp = 0, fn = 0, tn = 0;
