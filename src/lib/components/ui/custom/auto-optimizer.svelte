@@ -43,9 +43,9 @@
 	let currentSession = $state(null);
 	let windowsPerConfig = 20;
 
-	function computeAccuracy(classifications, windowSize) {
-		let correct = 0;
-		let total = 0;
+	function computeMetrics(classifications, windowSize) {
+		let tp = 0, fp = 0, fn = 0, tn = 0;
+		let correct = 0, total = 0;
 		for (const cls of classifications) {
 			const windowRows = rows.slice(cls.windowStart, cls.windowEnd);
 			const counts = { DRILLING: 0, NOT_DRILLING: 0 };
@@ -55,17 +55,30 @@
 			}
 			const gt = counts.DRILLING + counts.NOT_DRILLING;
 			if (gt === 0) continue;
-			if (counts.DRILLING === gt) { total++; if (cls.label === 'DRILLING') correct++; }
-			else if (counts.NOT_DRILLING === gt) { total++; if (cls.label === 'NOT_DRILLING') correct++; }
+			let groundTruth = null;
+			if (counts.DRILLING === gt) groundTruth = 'DRILLING';
+			else if (counts.NOT_DRILLING === gt) groundTruth = 'NOT_DRILLING';
+			else continue; // mixed window
+
+			total++;
+			if (cls.label === groundTruth) correct++;
+			if (cls.label === 'DRILLING' && groundTruth === 'DRILLING') tp++;
+			if (cls.label === 'DRILLING' && groundTruth === 'NOT_DRILLING') fp++;
+			if (cls.label === 'NOT_DRILLING' && groundTruth === 'DRILLING') fn++;
+			if (cls.label === 'NOT_DRILLING' && groundTruth === 'NOT_DRILLING') tn++;
 		}
-		return { correct, total, accuracy: total > 0 ? ((correct / total) * 100).toFixed(1) : '0' };
+		const accuracy = total > 0 ? ((correct / total) * 100).toFixed(1) : '0';
+		const precision = tp + fp > 0 ? tp / (tp + fp) : 0;
+		const recall = tp + fn > 0 ? tp / (tp + fn) : 0;
+		const f1 = precision + recall > 0 ? ((2 * precision * recall) / (precision + recall) * 100).toFixed(1) : '0';
+		return { correct, total, accuracy, f1, precision: (precision * 100).toFixed(1), recall: (recall * 100).toFixed(1) };
 	}
 
 	let bestResult = $derived.by(() => {
 		if (!results.length) return null;
 		return results.reduce((best, r) => {
-			const a = parseFloat(r.accuracy) || 0;
-			const b = parseFloat(best.accuracy) || 0;
+			const a = parseFloat(r.f1) || 0;
+			const b = parseFloat(best.f1) || 0;
 			return a > b ? r : best;
 		});
 	});
@@ -80,8 +93,9 @@
 			...results[currentIdx].classifications,
 			{ label, windowStart, windowEnd }
 		];
-		const stats = computeAccuracy(results[currentIdx].classifications, results[currentIdx].config.windowSize);
+		const stats = computeMetrics(results[currentIdx].classifications, results[currentIdx].config.windowSize);
 		results[currentIdx].accuracy = stats.accuracy;
+		results[currentIdx].f1 = stats.f1;
 		results[currentIdx].correct = stats.correct;
 		results[currentIdx].total = stats.total;
 		results = [...results];
@@ -98,6 +112,7 @@
 			config: { ...cfg, stepSize: cfg.windowSize },
 			classifications: [],
 			accuracy: '--',
+			f1: '--',
 			correct: 0,
 			total: 0,
 			status: 'pending'
@@ -224,6 +239,7 @@
 			config: { ...cfg, stepSize: cfg.windowSize },
 			classifications: [],
 			accuracy: '--',
+			f1: '--',
 			correct: 0,
 			total: 0,
 			status: 'pending'
@@ -274,11 +290,11 @@
 		</div>
 
 		<!-- Best result -->
-		{#if bestResult && parseFloat(bestResult.accuracy) > 0}
+		{#if bestResult && parseFloat(bestResult.f1) > 0}
 			<div class="border-atai-good/30 bg-atai-good/5 flex items-center justify-between rounded-xs border p-2">
 				<div>
-					<p class="text-atai-good font-mono text-sm font-medium">{bestResult.accuracy}% accuracy</p>
-					<p class="text-muted-foreground font-mono text-[10px]">{configLabel(bestResult.config)}</p>
+					<p class="text-atai-good font-mono text-sm font-medium">F1: {bestResult.f1}%</p>
+					<p class="text-muted-foreground font-mono text-[10px]">{configLabel(bestResult.config)} · Acc: {bestResult.accuracy}%</p>
 				</div>
 				<Button
 					variant="default"
@@ -294,14 +310,14 @@
 		<!-- Results leaderboard -->
 		<ScrollArea class="min-h-0 flex-1">
 			<div class="flex flex-col gap-1 pr-3">
-				{#each [...results].sort((a, b) => (parseFloat(b.accuracy) || 0) - (parseFloat(a.accuracy) || 0)) as r, i (configLabel(r.config))}
+				{#each [...results].sort((a, b) => (parseFloat(b.f1) || 0) - (parseFloat(a.f1) || 0)) as r, i (configLabel(r.config))}
 					<div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 rounded-xs px-2 py-1 font-mono text-[10px]">
-						<span class="w-8 text-right">
+						<span class="w-12 text-right">
 							{#if r.status === 'running'}
 								<SpinnerIcon class="text-atai-warning inline size-3 animate-spin" />
 							{:else if r.status === 'done'}
-								<span class={parseFloat(r.accuracy) > 0 ? 'text-foreground' : 'text-muted-foreground'}>
-									{r.accuracy}%
+								<span class={parseFloat(r.f1) > 0 ? 'text-foreground' : 'text-muted-foreground'}>
+									F1:{r.f1}%
 								</span>
 							{:else if r.status === 'error'}
 								<span class="text-atai-critical">err</span>
