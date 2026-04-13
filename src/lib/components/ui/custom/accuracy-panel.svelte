@@ -86,6 +86,10 @@
 	class={cn('flex flex-col gap-3', className)}
 	{...restProps}
 >
+	<p class="text-muted-foreground text-[9px]">
+		Only counts unanimous windows (all rows same ACTC label). Mixed/transition windows are skipped.
+	</p>
+
 	<!-- Overall accuracy gauge -->
 	<div class="flex flex-wrap items-center gap-3">
 		<div class="flex flex-col items-center">
