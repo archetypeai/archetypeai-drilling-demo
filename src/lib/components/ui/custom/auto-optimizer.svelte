@@ -106,30 +106,45 @@
 		await runCurrentConfig();
 	}
 
+	let configTimeout = null;
+
 	async function runCurrentConfig() {
-		if (currentIdx >= results.length) {
+		if (!running || currentIdx >= results.length) {
 			running = false;
 			return;
 		}
 		results[currentIdx].status = 'running';
 		results = [...results];
+
+		// Set a timeout — if we don't get enough results in 45s, move on
+		if (configTimeout) clearTimeout(configTimeout);
+		configTimeout = setTimeout(() => {
+			if (running && currentIdx < results.length && results[currentIdx].status === 'running') {
+				console.log(`Config ${currentIdx} timed out, advancing`);
+				advanceToNext();
+			}
+		}, 45000);
+
 		try {
 			await onstartConfig?.(results[currentIdx].config);
 		} catch (err) {
 			console.error('Config failed:', err);
 			results[currentIdx].status = 'error';
+			if (configTimeout) clearTimeout(configTimeout);
 			advanceToNext();
 		}
 	}
 
 	async function advanceToNext() {
+		if (configTimeout) clearTimeout(configTimeout);
+		if (!running) return;
 		if (currentIdx >= 0 && currentIdx < results.length) {
 			results[currentIdx].status = 'done';
 			results = [...results];
 			await onstopConfig?.();
 		}
 		currentIdx++;
-		if (currentIdx < results.length) {
+		if (running && currentIdx < results.length) {
 			await runCurrentConfig();
 		} else {
 			running = false;
@@ -138,6 +153,12 @@
 
 	function stopOptimization() {
 		running = false;
+		if (configTimeout) clearTimeout(configTimeout);
+		// Mark current running config as done
+		if (currentIdx >= 0 && currentIdx < results.length && results[currentIdx].status === 'running') {
+			results[currentIdx].status = 'done';
+			results = [...results];
+		}
 		onstopConfig?.();
 	}
 
