@@ -452,17 +452,20 @@
 			// Fallback: proceed after 30s even if not open
 			setTimeout(() => { clearInterval(check); resolve(); }, 30000);
 		});
-		console.log('[OPTIMIZER] SSE ready, streaming windows...');
+		console.log('[OPTIMIZER] SSE ready, streaming windows with 2s delays...');
 
-		// Stream windows for this config
+		// Stream windows gradually (not burst) — matching A/B pattern
 		const windowSize = config.windowSize;
 		for (let i = 0; i < 20 && i * windowSize + windowSize <= wellData.length; i++) {
+			if (!optimizerSession) break; // stopped
 			const start = i * windowSize;
 			const windowRows = wellData.slice(start, start + windowSize);
 			await streamWindowToNewton(result.sessionId, windowRows);
-			// Small delay between windows to let Newton process
-			await new Promise((r) => setTimeout(r, 200));
+			console.log(`[OPTIMIZER] streamed window ${i + 1}/20`);
+			// Longer delay between windows — give Newton time to process and respond
+			await new Promise((r) => setTimeout(r, 2000));
 		}
+		console.log('[OPTIMIZER] all windows streamed, waiting for results...');
 	}
 
 	async function handleOptimizerStop() {
