@@ -41,7 +41,7 @@
 
 	let currentIdx = $state(-1);
 	let currentSession = $state(null);
-	let windowsPerConfig = 20;
+	let windowsPerConfig = 50;
 
 	function computeAccuracy(classifications, windowSize) {
 		let correct = 0;

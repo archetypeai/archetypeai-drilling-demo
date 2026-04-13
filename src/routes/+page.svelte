@@ -456,12 +456,12 @@
 
 		// Stream windows gradually (not burst) — matching A/B pattern
 		const windowSize = config.windowSize;
-		for (let i = 0; i < 20 && i * windowSize + windowSize <= wellData.length; i++) {
+		for (let i = 0; i < 50 && i * windowSize + windowSize <= wellData.length; i++) {
 			if (!optimizerSession) break; // stopped
 			const start = i * windowSize;
 			const windowRows = wellData.slice(start, start + windowSize);
 			await streamWindowToNewton(result.sessionId, windowRows);
-			console.log(`[OPTIMIZER] streamed window ${i + 1}/20`);
+			console.log(`[OPTIMIZER] streamed window ${i + 1}/50`);
 			// Longer delay between windows — give Newton time to process and respond
 			await new Promise((r) => setTimeout(r, 2000));
 		}
