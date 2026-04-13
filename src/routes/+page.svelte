@@ -16,7 +16,7 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import WandIcon from '@lucide/svelte/icons/wand-sparkles';
 	import FlaskConicalIcon from '@lucide/svelte/icons/flask-conical';
-	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
+	import { fetchWells, fetchWellChunk, fetchMixedOffset, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
 	const DEFAULT_CONFIG = {
 		windowSize: 64,
@@ -382,16 +382,24 @@
 			});
 			abSessions[slot].sseSource = sseEs;
 
-			// Find mixed data section and stream from there
-			const { offset: abOffset, mix } = findMixedOffset(config.windowSize, 11);
-			console.log(`[A/B ${slot}] data offset: ${abOffset} (mix: ${(mix * 100).toFixed(1)}%)`);
+			// Find mixed data section from full well (server-side)
+			const abMixed = selectedWell ? await fetchMixedOffset(selectedWell.id, config.windowSize, 11) : { offset: 0, mix: 0 };
+			console.log(`[A/B ${slot}] data offset: ${abMixed.offset} (mix: ${abMixed.mix}%)`);
+
+			let abData;
+			try {
+				const chunk = await fetchWellChunk(selectedWell.id, abMixed.offset, 11 * config.windowSize);
+				abData = chunk.rows;
+			} catch {
+				abData = wellData;
+			}
 
 			await new Promise((r) => setTimeout(r, 3000));
 
-			if (abOffset + config.windowSize <= wellData.length) {
-				for (let i = 0; i < 10 && abOffset + (i + 1) * config.windowSize <= wellData.length; i++) {
-					const start = abOffset + i * config.windowSize;
-					const windowRows = wellData.slice(start, start + config.windowSize);
+			if (abData.length >= config.windowSize) {
+				for (let i = 0; i < 10 && (i + 1) * config.windowSize <= abData.length; i++) {
+					const start = i * config.windowSize;
+					const windowRows = abData.slice(start, start + config.windowSize);
 					await streamWindowToNewton(result.sessionId, windowRows);
 					if (abSessions[slot]) abSessions[slot].streamCounter = i + 1;
 					await new Promise((r) => setTimeout(r, 200));
@@ -468,10 +476,23 @@
 			// Fallback: proceed after 30s even if not open
 			setTimeout(() => { clearInterval(check); resolve(); }, 30000);
 		});
-		// Find a section with mixed drilling/not-drilling activity
+		// Find a section with mixed drilling/not-drilling from full well data (server-side)
 		const windowSize = config.windowSize;
-		const { offset: bestOffset, mix: bestMix } = findMixedOffset(windowSize);
-		console.log(`[OPTIMIZER] data offset: ${bestOffset} (mix: ${(bestMix * 100).toFixed(1)}% minority class)`);
+		const mixedResult = selectedWell ? await fetchMixedOffset(selectedWell.id, windowSize) : { offset: 0, mix: 0 };
+		const bestOffset = mixedResult.offset;
+		console.log(`[OPTIMIZER] data offset: ${bestOffset} (mix: ${mixedResult.mix}% minority class, total: ${mixedResult.totalRows} rows)`);
+
+		// Load the data chunk we need for streaming
+		const neededRows = (41) * windowSize;
+		let optimizerData;
+		try {
+			const chunk = await fetchWellChunk(selectedWell.id, bestOffset, neededRows);
+			optimizerData = chunk.rows;
+			console.log(`[OPTIMIZER] loaded ${optimizerData.length} rows from offset ${bestOffset}`);
+		} catch {
+			optimizerData = wellData;
+			console.warn('[OPTIMIZER] failed to load chunk, using client data');
+		}
 
 		// Track when first result arrives (warm-up complete)
 		let firstResultReceived = false;
@@ -486,8 +507,8 @@
 
 		// Send probe window and wait for Newton to be ready
 		console.log('[OPTIMIZER] sending probe window...');
-		if (bestOffset + windowSize <= wellData.length) {
-			await streamWindowToNewton(result.sessionId, wellData.slice(bestOffset, bestOffset + windowSize));
+		if (optimizerData.length >= windowSize) {
+			await streamWindowToNewton(result.sessionId, optimizerData.slice(0, windowSize));
 		}
 
 		// Wait up to 90s for first result
@@ -501,11 +522,11 @@
 		}
 
 		// Stream 40 inference windows from the mixed section
-		console.log('[OPTIMIZER] streaming 40 inference windows from offset', bestOffset);
-		for (let i = 1; i <= 40 && bestOffset + (i + 1) * windowSize <= wellData.length; i++) {
+		console.log('[OPTIMIZER] streaming 40 inference windows...');
+		for (let i = 1; i <= 40 && (i + 1) * windowSize <= optimizerData.length; i++) {
 			if (!optimizerSession) break;
-			const start = bestOffset + i * windowSize;
-			const windowRows = wellData.slice(start, start + windowSize);
+			const start = i * windowSize;
+			const windowRows = optimizerData.slice(start, start + windowSize);
 			await streamWindowToNewton(result.sessionId, windowRows);
 			await new Promise((r) => setTimeout(r, 1000));
 		}
