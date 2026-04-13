@@ -18,6 +18,7 @@
 		accuracy = null,
 		onstart,
 		onstop,
+		onapply,
 		class: className,
 		...restProps
 	} = $props();
@@ -40,11 +41,16 @@
 				<SpinnerIcon class="size-3 animate-spin" style="color: {color};" />
 			{/if}
 		</div>
-		{#if running}
-			<Button variant="outline" size="sm" onclick={onstop}>Stop</Button>
-		{:else}
-			<Button variant="default" size="sm" onclick={onstart}>Run</Button>
-		{/if}
+		<div class="flex gap-1">
+			{#if running}
+				<Button variant="outline" size="sm" onclick={onstop}>Stop</Button>
+			{:else}
+				<Button variant="default" size="sm" onclick={onstart}>Run</Button>
+			{/if}
+			{#if accuracy !== null && onapply}
+				<Button variant="outline" size="sm" onclick={onapply}>Apply</Button>
+			{/if}
+		</div>
 	</div>
 
 	<div class="grid grid-cols-2 gap-x-3 gap-y-1">

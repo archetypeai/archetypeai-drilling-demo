@@ -121,6 +121,7 @@
 			accuracy={accuracyA !== '--' ? accuracyA : null}
 			onstart={() => onstartSession?.('a', { ...configA, stepSize: configA.windowSize })}
 			onstop={() => onstopSession?.('a')}
+			onapply={() => onapplyConfig?.({ ...configA, stepSize: configA.windowSize })}
 		/>
 		<ConfigEditor
 			label="B"
@@ -130,6 +131,7 @@
 			accuracy={accuracyB !== '--' ? accuracyB : null}
 			onstart={() => onstartSession?.('b', { ...configB, stepSize: configB.windowSize })}
 			onstop={() => onstopSession?.('b')}
+			onapply={() => onapplyConfig?.({ ...configB, stepSize: configB.windowSize })}
 		/>
 	</div>
 
