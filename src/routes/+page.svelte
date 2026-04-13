@@ -452,18 +452,39 @@
 			// Fallback: proceed after 30s even if not open
 			setTimeout(() => { clearInterval(check); resolve(); }, 30000);
 		});
-		console.log('[OPTIMIZER] SSE ready, streaming windows with 2s delays...');
+		// Warm up: send probe window and wait for first result
+		console.log('[OPTIMIZER] sending probe window to warm up Newton...');
+		let warmedUp = false;
+		const warmupHandler = (event) => {
+			const label = parseSSELabel(event);
+			if (label) { warmedUp = true; console.log('[OPTIMIZER] warm-up complete, first result:', label); }
+		};
+		es.addEventListener('message', warmupHandler);
 
-		// Stream windows gradually (not burst) — matching A/B pattern
 		const windowSize = config.windowSize;
-		for (let i = 0; i < 50 && i * windowSize + windowSize <= wellData.length; i++) {
-			if (!optimizerSession) break; // stopped
+		if (windowSize <= wellData.length) {
+			await streamWindowToNewton(result.sessionId, wellData.slice(0, windowSize));
+		}
+
+		// Wait up to 60s for first result
+		const warmupStart = Date.now();
+		while (!warmedUp && Date.now() - warmupStart < 60000 && optimizerSession) {
+			await new Promise((r) => setTimeout(r, 500));
+		}
+		es.removeEventListener('message', warmupHandler);
+
+		if (!warmedUp) {
+			console.warn('[OPTIMIZER] warm-up timed out after 60s');
+		}
+
+		// Now stream 20 windows that should all produce results
+		console.log('[OPTIMIZER] streaming 20 inference windows...');
+		for (let i = 1; i <= 20 && (i + 1) * windowSize <= wellData.length; i++) {
+			if (!optimizerSession) break;
 			const start = i * windowSize;
 			const windowRows = wellData.slice(start, start + windowSize);
 			await streamWindowToNewton(result.sessionId, windowRows);
-			console.log(`[OPTIMIZER] streamed window ${i + 1}/50`);
-			// Longer delay between windows — give Newton time to process and respond
-			await new Promise((r) => setTimeout(r, 2000));
+			await new Promise((r) => setTimeout(r, 1000));
 		}
 		console.log('[OPTIMIZER] all windows streamed, waiting for results...');
 	}
