@@ -493,6 +493,9 @@
 			setupStep = '';
 			startSSE();
 			preStreamWindows(5);
+
+			// Auto-play after applying config
+			handlePlay();
 		} catch (err) {
 			console.error('Session failed:', err);
 			sessionStatus = 'error';
