@@ -692,13 +692,13 @@
 			<p class="text-foreground mb-3 text-sm">
 				This will stop the current session and restart with the new config:
 			</p>
-			<table class="mb-4 w-full font-mono text-sm">
-				<tr><td class="text-muted-foreground py-0.5 pr-4">Window size</td><td class="text-foreground">{pendingConfig.windowSize}</td></tr>
-				<tr><td class="text-muted-foreground py-0.5 pr-4">Step size</td><td class="text-foreground">{pendingConfig.stepSize || pendingConfig.windowSize}</td></tr>
-				<tr><td class="text-muted-foreground py-0.5 pr-4">K neighbors</td><td class="text-foreground">{pendingConfig.nNeighbors}</td></tr>
-				<tr><td class="text-muted-foreground py-0.5 pr-4">Metric</td><td class="text-foreground">{pendingConfig.metric}</td></tr>
-				<tr><td class="text-muted-foreground py-0.5 pr-4">Weights</td><td class="text-foreground">{pendingConfig.weights}</td></tr>
-			</table>
+			<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 16px;font-family:var(--font-mono);font-size:14px;margin-bottom:16px;">
+				<span class="text-muted-foreground">Window size</span><span class="text-foreground">{pendingConfig.windowSize}</span>
+				<span class="text-muted-foreground">Step size</span><span class="text-foreground">{pendingConfig.stepSize || pendingConfig.windowSize}</span>
+				<span class="text-muted-foreground">K neighbors</span><span class="text-foreground">{pendingConfig.nNeighbors}</span>
+				<span class="text-muted-foreground">Metric</span><span class="text-foreground">{pendingConfig.metric}</span>
+				<span class="text-muted-foreground">Weights</span><span class="text-foreground">{pendingConfig.weights}</span>
+			</div>
 			<p class="text-muted-foreground mb-4 text-xs">
 				Playback will reset. Classification history will be cleared. Config will be saved for next app load.
 			</p>
