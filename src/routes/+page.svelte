@@ -391,6 +391,13 @@
 
 	// Auto optimizer: start a config
 	async function handleOptimizerStart(config) {
+		// Pause main session SSE to avoid competing consumers
+		if (sseSource) {
+			console.log('[OPTIMIZER] pausing main SSE');
+			sseSource.close();
+			sseSource = null;
+		}
+
 		// Clean up previous optimizer session
 		if (optimizerSseSource) optimizerSseSource.close();
 		if (optimizerSession) {
@@ -463,6 +470,11 @@
 		if (optimizerSession) {
 			try { await endSession(optimizerSession); } catch {}
 			optimizerSession = null;
+		}
+		// Reconnect main SSE if session is still active
+		if (sessionId && sseUrl && !sseSource) {
+			console.log('[OPTIMIZER] reconnecting main SSE');
+			startSSE();
 		}
 	}
 
