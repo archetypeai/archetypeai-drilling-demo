@@ -399,6 +399,8 @@
 
 		const result = await startSession(() => {}, config);
 		optimizerSession = result.sessionId;
+		console.log('[OPTIMIZER] session:', result.sessionId, 'sseUrl:', result.sseUrl);
+		console.log('[OPTIMIZER] main session:', sessionId, 'main sseUrl:', sseUrl);
 
 		const sseProxyUrl = `/api/sse-proxy?url=${encodeURIComponent(result.sseUrl)}`;
 		const es = new EventSource(sseProxyUrl);
