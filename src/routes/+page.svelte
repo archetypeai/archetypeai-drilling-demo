@@ -445,33 +445,36 @@
 			// Fallback: proceed after 30s even if not open
 			setTimeout(() => { clearInterval(check); resolve(); }, 30000);
 		});
-		// Warm up: send probe window and wait for first result
-		console.log('[OPTIMIZER] sending probe window to warm up Newton...');
-		let warmedUp = false;
-		const warmupHandler = (event) => {
-			const label = parseSSELabel(event);
-			if (label) { warmedUp = true; console.log('[OPTIMIZER] warm-up complete, first result:', label); }
+		// Track when first result arrives (warm-up complete)
+		let firstResultReceived = false;
+		const origOnMessage = es.onmessage;
+		es.onmessage = (event) => {
+			if (!firstResultReceived) {
+				firstResultReceived = true;
+				console.log('[OPTIMIZER] warm-up complete, first result received');
+			}
+			origOnMessage?.(event);
 		};
-		es.addEventListener('message', warmupHandler);
 
+		// Send probe window and wait for Newton to be ready
 		const windowSize = config.windowSize;
+		console.log('[OPTIMIZER] sending probe window...');
 		if (windowSize <= wellData.length) {
 			await streamWindowToNewton(result.sessionId, wellData.slice(0, windowSize));
 		}
 
-		// Wait up to 60s for first result
+		// Wait up to 90s for first result
 		const warmupStart = Date.now();
-		while (!warmedUp && Date.now() - warmupStart < 90000 && optimizerSession) {
+		while (!firstResultReceived && Date.now() - warmupStart < 90000 && optimizerSession) {
 			await new Promise((r) => setTimeout(r, 500));
 		}
-		es.removeEventListener('message', warmupHandler);
 
-		if (!warmedUp) {
-			console.warn('[OPTIMIZER] warm-up timed out after 90s');
+		if (!firstResultReceived) {
+			console.warn('[OPTIMIZER] warm-up timed out after 90s, streaming anyway...');
 		}
 
-		// Now stream 20 windows that should all produce results
-		console.log('[OPTIMIZER] streaming 20 inference windows...');
+		// Stream 40 inference windows
+		console.log('[OPTIMIZER] streaming 40 inference windows...');
 		for (let i = 1; i <= 40 && (i + 1) * windowSize <= wellData.length; i++) {
 			if (!optimizerSession) break;
 			const start = i * windowSize;
