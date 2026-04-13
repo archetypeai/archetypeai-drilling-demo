@@ -522,6 +522,23 @@
 		}
 
 		// Stream 40 inference windows from the mixed section
+		// Log ground truth distribution across windows
+		let gtDrilling = 0, gtNotDrilling = 0, gtMixed = 0;
+		for (let i = 0; i <= 40 && (i + 1) * windowSize <= optimizerData.length; i++) {
+			const start = i * windowSize;
+			const windowRows = optimizerData.slice(start, start + windowSize);
+			let d = 0, n = 0;
+			for (const row of windowRows) {
+				const actc = row?.ACTC?.trim();
+				if (actc === '1' || actc === '2') d++;
+				else if (actc === '3' || actc === '4' || actc === '8' || actc === '9') n++;
+			}
+			if (d > 0 && n === 0) gtDrilling++;
+			else if (n > 0 && d === 0) gtNotDrilling++;
+			else gtMixed++;
+		}
+		console.log(`[OPTIMIZER] window ground truth: ${gtDrilling} drilling, ${gtNotDrilling} not-drilling, ${gtMixed} mixed`);
+
 		console.log('[OPTIMIZER] streaming 40 inference windows...');
 		for (let i = 1; i <= 40 && (i + 1) * windowSize <= optimizerData.length; i++) {
 			if (!optimizerSession) break;
