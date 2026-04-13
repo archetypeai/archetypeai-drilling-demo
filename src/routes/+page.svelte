@@ -322,6 +322,26 @@
 		sessionStatus = 'idle';
 	}
 
+	function findMixedOffset(windowSize, numWindows = 41) {
+		const scanSize = numWindows * windowSize;
+		let bestOffset = 0;
+		let bestMix = 0;
+		for (let offset = 0; offset + scanSize <= wellData.length; offset += windowSize * 10) {
+			const section = wellData.slice(offset, offset + scanSize);
+			let drilling = 0, notDrilling = 0;
+			for (const row of section) {
+				const actc = row?.ACTC?.trim();
+				if (actc === '1' || actc === '2') drilling++;
+				else if (actc === '3' || actc === '4' || actc === '8' || actc === '9') notDrilling++;
+			}
+			const total = drilling + notDrilling;
+			if (total === 0) continue;
+			const mix = Math.min(drilling, notDrilling) / total;
+			if (mix > bestMix) { bestMix = mix; bestOffset = offset; }
+		}
+		return { offset: bestOffset, mix: bestMix };
+	}
+
 	function toggleExpand(panel) {
 		expanded = expanded === panel ? null : panel;
 	}
@@ -362,12 +382,15 @@
 			});
 			abSessions[slot].sseSource = sseEs;
 
-			// Wait for n-shot processing then pre-stream windows
+			// Find mixed data section and stream from there
+			const { offset: abOffset, mix } = findMixedOffset(config.windowSize, 11);
+			console.log(`[A/B ${slot}] data offset: ${abOffset} (mix: ${(mix * 100).toFixed(1)}%)`);
+
 			await new Promise((r) => setTimeout(r, 3000));
 
-			if (wellData.length >= config.windowSize) {
-				for (let i = 0; i < 10 && (i + 1) * config.windowSize <= wellData.length; i++) {
-					const start = i * config.windowSize;
+			if (abOffset + config.windowSize <= wellData.length) {
+				for (let i = 0; i < 10 && abOffset + (i + 1) * config.windowSize <= wellData.length; i++) {
+					const start = abOffset + i * config.windowSize;
 					const windowRows = wellData.slice(start, start + config.windowSize);
 					await streamWindowToNewton(result.sessionId, windowRows);
 					if (abSessions[slot]) abSessions[slot].streamCounter = i + 1;
@@ -445,6 +468,11 @@
 			// Fallback: proceed after 30s even if not open
 			setTimeout(() => { clearInterval(check); resolve(); }, 30000);
 		});
+		// Find a section with mixed drilling/not-drilling activity
+		const windowSize = config.windowSize;
+		const { offset: bestOffset, mix: bestMix } = findMixedOffset(windowSize);
+		console.log(`[OPTIMIZER] data offset: ${bestOffset} (mix: ${(bestMix * 100).toFixed(1)}% minority class)`);
+
 		// Track when first result arrives (warm-up complete)
 		let firstResultReceived = false;
 		const origOnMessage = es.onmessage;
@@ -457,10 +485,9 @@
 		};
 
 		// Send probe window and wait for Newton to be ready
-		const windowSize = config.windowSize;
 		console.log('[OPTIMIZER] sending probe window...');
-		if (windowSize <= wellData.length) {
-			await streamWindowToNewton(result.sessionId, wellData.slice(0, windowSize));
+		if (bestOffset + windowSize <= wellData.length) {
+			await streamWindowToNewton(result.sessionId, wellData.slice(bestOffset, bestOffset + windowSize));
 		}
 
 		// Wait up to 90s for first result
@@ -473,11 +500,11 @@
 			console.warn('[OPTIMIZER] warm-up timed out after 90s, streaming anyway...');
 		}
 
-		// Stream 40 inference windows
-		console.log('[OPTIMIZER] streaming 40 inference windows...');
-		for (let i = 1; i <= 40 && (i + 1) * windowSize <= wellData.length; i++) {
+		// Stream 40 inference windows from the mixed section
+		console.log('[OPTIMIZER] streaming 40 inference windows from offset', bestOffset);
+		for (let i = 1; i <= 40 && bestOffset + (i + 1) * windowSize <= wellData.length; i++) {
 			if (!optimizerSession) break;
-			const start = i * windowSize;
+			const start = bestOffset + i * windowSize;
 			const windowRows = wellData.slice(start, start + windowSize);
 			await streamWindowToNewton(result.sessionId, windowRows);
 			await new Promise((r) => setTimeout(r, 1000));
