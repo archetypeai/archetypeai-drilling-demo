@@ -98,7 +98,7 @@
 			<span class="text-foreground font-mono text-xl font-medium">
 				{rollingAccuracy}{rollingAccuracy !== '--' ? '%' : ''}
 			</span>
-			<span class="text-muted-foreground text-[9px]">Rolling</span>
+			<span class="text-muted-foreground text-[9px]">Last 20w</span>
 		</div>
 		<div class="flex flex-col gap-0.5">
 			<div class="flex gap-2 font-mono text-[9px]">

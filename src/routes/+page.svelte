@@ -677,33 +677,35 @@
 	</div>
 {/if}
 
-<!-- Apply config confirmation modal -->
-<ConfirmModal
-	bind:open={showApplyModal}
-	title="Apply Config"
-	onconfirm={confirmApplyConfig}
->
-	{#if pendingConfig}
-		<p class="text-foreground mb-3 text-sm">
-			This will stop the current session and restart with the new config:
-		</p>
-		<div class="border-border rounded-xs border p-3">
-			<div class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-sm">
-				<span class="text-muted-foreground">Window size</span>
-				<span class="text-foreground">{pendingConfig.windowSize}</span>
-				<span class="text-muted-foreground">Step size</span>
-				<span class="text-foreground">{pendingConfig.stepSize || pendingConfig.windowSize}</span>
-				<span class="text-muted-foreground">K neighbors</span>
-				<span class="text-foreground">{pendingConfig.nNeighbors}</span>
-				<span class="text-muted-foreground">Metric</span>
-				<span class="text-foreground">{pendingConfig.metric}</span>
-				<span class="text-muted-foreground">Weights</span>
-				<span class="text-foreground">{pendingConfig.weights}</span>
+<!-- Apply config confirmation modal (inline to avoid grid containment) -->
+{#if showApplyModal && pendingConfig}
+	<div
+		style="position:fixed;top:0;left:0;width:100vw;height:100vh;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);"
+		onclick={(e) => { if (e.target === e.currentTarget) showApplyModal = false; }}
+		onkeydown={(e) => { if (e.key === 'Escape') showApplyModal = false; }}
+		role="dialog"
+		aria-modal="true"
+		tabindex="-1"
+	>
+		<div style="background:var(--card);border:1px solid var(--border);border-radius:2px;padding:24px;width:420px;max-width:90vw;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+			<h3 class="text-foreground mb-4 font-mono text-base uppercase tracking-wider">Apply Config</h3>
+			<p class="text-foreground mb-3 text-sm">
+				This will stop the current session and restart with the new config:
+			</p>
+			<table class="mb-4 w-full font-mono text-sm">
+				<tr><td class="text-muted-foreground py-0.5 pr-4">Window size</td><td class="text-foreground">{pendingConfig.windowSize}</td></tr>
+				<tr><td class="text-muted-foreground py-0.5 pr-4">Step size</td><td class="text-foreground">{pendingConfig.stepSize || pendingConfig.windowSize}</td></tr>
+				<tr><td class="text-muted-foreground py-0.5 pr-4">K neighbors</td><td class="text-foreground">{pendingConfig.nNeighbors}</td></tr>
+				<tr><td class="text-muted-foreground py-0.5 pr-4">Metric</td><td class="text-foreground">{pendingConfig.metric}</td></tr>
+				<tr><td class="text-muted-foreground py-0.5 pr-4">Weights</td><td class="text-foreground">{pendingConfig.weights}</td></tr>
+			</table>
+			<p class="text-muted-foreground mb-4 text-xs">
+				Playback will reset. Classification history will be cleared. Config will be saved for next app load.
+			</p>
+			<div class="flex justify-end gap-2">
+				<Button variant="outline" size="sm" onclick={() => (showApplyModal = false)}>Cancel</Button>
+				<Button variant="default" size="sm" onclick={() => { showApplyModal = false; confirmApplyConfig(); }}>Apply & Restart</Button>
 			</div>
 		</div>
-		<p class="text-muted-foreground mt-3 text-xs">
-			Playback will reset. Classification history will be cleared.
-			This config will be saved and used on next app load.
-		</p>
-	{/if}
-</ConfirmModal>
+	</div>
+{/if}
