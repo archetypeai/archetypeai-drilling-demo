@@ -116,14 +116,14 @@
 		results[currentIdx].status = 'running';
 		results = [...results];
 
-		// Set a timeout — if we don't get enough results in 45s, move on
+		// Set a timeout — if we don't get enough results in 3 min, move on
 		if (configTimeout) clearTimeout(configTimeout);
 		configTimeout = setTimeout(() => {
 			if (running && currentIdx < results.length && results[currentIdx].status === 'running') {
 				console.log(`Config ${currentIdx} timed out, advancing`);
 				advanceToNext();
 			}
-		}, 45000);
+		}, 180000);
 
 		try {
 			await onstartConfig?.(results[currentIdx].config);
@@ -244,7 +244,7 @@
 	{...restProps}
 >
 	<p class="text-muted-foreground text-[10px]">
-		{results.length > 0 ? `${results.length} configs tested` : `Tries 10 configs`} ({windowsPerConfig} windows each) · Round {roundNumber}
+		{results.length > 0 ? `${results.length} configs tested` : `Tries 10 configs`} ({windowsPerConfig} windows each, ~3 min/config) · Round {roundNumber}
 	</p>
 
 	{#if !running && results.length === 0}
