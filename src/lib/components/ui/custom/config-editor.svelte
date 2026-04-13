@@ -31,24 +31,24 @@
 
 <div class={cn('border-border flex flex-col gap-2 rounded-xs border p-2', className)} {...restProps}>
 	<div class="flex items-center justify-between">
-		<div class="flex items-center gap-2">
-			<span class="rounded-xs border px-1.5 py-0.5 font-mono text-xs" style="border-color: {color}; color: {color};">
+		<div class="flex items-center gap-1.5">
+			<span class="rounded-xs border px-1 py-0.5 font-mono text-[10px]" style="border-color: {color}; color: {color};">
 				{label}
 			</span>
 			{#if accuracy !== null}
-				<span class="font-mono text-sm" style="color: {color};">{accuracy}%</span>
+				<span class="font-mono text-xs" style="color: {color};">{accuracy}%</span>
 			{:else if running}
 				<SpinnerIcon class="size-3 animate-spin" style="color: {color};" />
 			{/if}
 		</div>
 		<div class="flex gap-1">
 			{#if running}
-				<Button variant="outline" size="sm" onclick={onstop}>Stop</Button>
+				<button class="border-border text-foreground rounded-xs border px-1.5 py-0.5 font-mono text-[9px]" onclick={onstop}>Stop</button>
 			{:else}
-				<Button variant="default" size="sm" onclick={onstart}>Run</Button>
+				<button class="bg-primary text-primary-foreground rounded-xs px-1.5 py-0.5 font-mono text-[9px]" onclick={onstart}>Run</button>
 			{/if}
 			{#if accuracy !== null && onapply}
-				<Button variant="outline" size="sm" onclick={onapply}>Apply</Button>
+				<button class="border-border text-foreground rounded-xs border px-1.5 py-0.5 font-mono text-[9px]" onclick={onapply}>Use</button>
 			{/if}
 		</div>
 	</div>
