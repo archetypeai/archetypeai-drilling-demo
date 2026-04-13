@@ -27,11 +27,11 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 
 Hyperparameter search lives in a separate tool: [archetypeai/newton-streaming-optimizer](https://github.com/archetypeai/newton-streaming-optimizer) brute-forces a grid of window sizes / KNN params against the streaming API and outputs a ready-to-use config JSON. Drop the winning values into `DEFAULT_CONFIG` in `src/lib/server/newton.js` to apply them here.
 
-The current default (`window=64, k=3, manhattan, distance`) is what the optimizer found on the bundled drilling slice. Re-run the optimizer against your own data if you want a different sensor set or balance.
+The current default (`window=32, k=3, euclidean, uniform`) is the most-confirmed config from optimizer runs (multiple ties at this point, all reproducible). Re-run the optimizer against your own data if you want a different sensor set or balance.
 
 ## Notes on the Streaming Encoder
 
-The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). On the optimizer's balanced 200K-row drilling slice, the tuned config (above) reaches **macro F1 ≈ 93%** (drilling P=100% / R=93.6%, not_drilling P=80.8% / R=100%). Per-well numbers in the demo will vary — wells with little or no drilling activity will inevitably show different metrics. The batch pipeline's `omega_1_3_surface` (domain-specific surface drilling encoder) is not yet available for the streaming/lens API.
+The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). On the optimizer's balanced 200K-row drilling slice, the tuned w32 config reaches **macro F1 ≈ 85%** (drilling P=98.5% / R=85.5%, not_drilling P=67.6% / R=95.8%). Per-well numbers in the demo will vary — wells with little or no drilling activity will inevitably show different metrics. The batch pipeline's `omega_1_3_surface` (domain-specific surface drilling encoder) is not yet available for the streaming/lens API.
 
 ## Stack
 
@@ -135,17 +135,17 @@ Optimized via [newton-streaming-optimizer](https://github.com/archetypeai/newton
   "model_name": "OmegaEncoder",
   "model_version": "OmegaEncoder::omega_embeddings_01",
   "normalize_input": true,
-  "buffer_size": 64,
+  "buffer_size": 32,
   "csv_configs": {
     "timestamp_column": "DATE_TIME",
     "data_columns": ["BPOS", "DBTM", "FLWI", "HDTH", "HKLD", "ROP", "RPM", "SPPA", "WOB"],
-    "window_size": 64,
-    "step_size": 64
+    "window_size": 32,
+    "step_size": 32
   },
   "knn_configs": {
     "n_neighbors": 3,
-    "metric": "manhattan",
-    "weights": "distance",
+    "metric": "euclidean",
+    "weights": "uniform",
     "algorithm": "ball_tree",
     "normalize_embeddings": false
   }

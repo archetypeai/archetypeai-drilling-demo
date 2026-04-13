@@ -82,14 +82,17 @@ async function waitForSession(sessionId, maxWaitMs = 60000) {
 }
 
 // Optimized via newton-streaming-optimizer:
-// w64 k3 manhattan distance → F1=93.0% Acc=94.9% on examples/drilling/inference.csv
-// (drilling: P=100% R=93.6% F1=96.7% / not_drilling: P=80.8% R=100% F1=89.4%)
+// w32 k3 euclidean uniform → F1≈85.4% Acc≈88.0% on examples/drilling/inference.csv
+// (3-way tie with k3-dist and k5-unif, all reproducible across multiple runs).
+// w64 k3 manhattan distance hit F1=93% in one run but the result wasn't
+// reproducible — most w64+ configs returned no predictions, so that 93% was
+// almost certainly an SSE timing artifact. Sticking with the reliable w32 baseline.
 const DEFAULT_CONFIG = {
-	windowSize: 64,
-	stepSize: 64,
+	windowSize: 32,
+	stepSize: 32,
 	nNeighbors: 3,
-	metric: 'manhattan',
-	weights: 'distance',
+	metric: 'euclidean',
+	weights: 'uniform',
 	algorithm: 'ball_tree',
 	normalizeEmbeddings: false
 };

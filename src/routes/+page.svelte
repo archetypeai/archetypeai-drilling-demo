@@ -15,12 +15,12 @@
 
 	// Mirrors src/lib/server/newton.js DEFAULT_CONFIG; used for display in Live Evaluation.
 	const DEFAULT_CONFIG = {
-		windowSize: 64,
-		stepSize: 64,
+		windowSize: 32,
+		stepSize: 32,
 		nShotPerClass: 2000,
 		nNeighbors: 3,
-		metric: 'manhattan',
-		weights: 'distance',
+		metric: 'euclidean',
+		weights: 'uniform',
 		algorithm: 'ball_tree'
 	};
 
