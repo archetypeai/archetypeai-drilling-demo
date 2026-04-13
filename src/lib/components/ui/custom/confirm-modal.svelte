@@ -33,14 +33,15 @@
 
 {#if open}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+		class="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+		style="width: 100vw; height: 100vh; top: 0; left: 0;"
 		onclick={handleBackdrop}
 		onkeydown={handleKeydown}
 		role="dialog"
 		aria-modal="true"
 		tabindex="-1"
 	>
-		<div class={cn('bg-card border-border w-full max-w-md rounded-xs border p-6 shadow-lg', className)} {...restProps}>
+		<div class={cn('bg-card border-border mx-4 w-full max-w-lg rounded-xs border p-6 shadow-lg', className)} {...restProps}>
 			<h3 class="text-foreground mb-3 font-mono text-base font-normal uppercase tracking-wider">{title}</h3>
 
 			<div class="mb-6">
