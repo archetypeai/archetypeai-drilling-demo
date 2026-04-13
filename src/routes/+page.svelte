@@ -13,12 +13,14 @@
 	import SettingsIcon from '@lucide/svelte/icons/settings';
 	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
+	// Mirrors src/lib/server/newton.js DEFAULT_CONFIG; used for display in Live Evaluation.
 	const DEFAULT_CONFIG = {
 		windowSize: 64,
 		stepSize: 64,
 		nShotPerClass: 2000,
-		nNeighbors: 5,
-		metric: 'euclidean',
+		nNeighbors: 3,
+		metric: 'manhattan',
+		weights: 'distance',
 		algorithm: 'ball_tree'
 	};
 

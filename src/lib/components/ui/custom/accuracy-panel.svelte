@@ -149,6 +149,8 @@
 			<span class="text-foreground">{config.nNeighbors ?? 5}</span>
 			<span class="text-muted-foreground">Metric</span>
 			<span class="text-foreground">{config.metric ?? 'manhattan'}</span>
+			<span class="text-muted-foreground">Weights</span>
+			<span class="text-foreground">{config.weights ?? 'uniform'}</span>
 			<span class="text-muted-foreground">Algorithm</span>
 			<span class="text-foreground">{config.algorithm ?? 'ball_tree'}</span>
 		</div>

@@ -81,12 +81,15 @@ async function waitForSession(sessionId, maxWaitMs = 60000) {
 	return false;
 }
 
+// Optimized via newton-streaming-optimizer:
+// w64 k3 manhattan distance → F1=93.0% Acc=94.9% on examples/drilling/inference.csv
+// (drilling: P=100% R=93.6% F1=96.7% / not_drilling: P=80.8% R=100% F1=89.4%)
 const DEFAULT_CONFIG = {
 	windowSize: 64,
 	stepSize: 64,
-	nNeighbors: 5,
-	metric: 'euclidean',
-	weights: 'uniform',
+	nNeighbors: 3,
+	metric: 'manhattan',
+	weights: 'distance',
 	algorithm: 'ball_tree',
 	normalizeEmbeddings: false
 };
