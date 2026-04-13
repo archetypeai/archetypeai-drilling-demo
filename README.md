@@ -2,7 +2,9 @@
 
 Drilling state classification dashboard powered by [Newton](https://www.archetypeai.dev/) and the [Equinor Volve Data Village](https://www.equinor.com/energy/volve-data-sharing).
 
-Plays back real drilling sensor data from 14 wells in the Volve oil field (North Sea, 2007-2016) and uses Newton's Machine State Lens to classify each data window as **drilling** or **not_drilling** in real-time via SSE streaming. Includes live accuracy tracking, A/B testing, and auto-optimization of KNN hyperparameters.
+Plays back real drilling sensor data from 14 wells in the Volve oil field (North Sea, 2007–2009 drilling phase) and uses Newton's Machine State Lens to classify each data window as **drilling** or **not_drilling** in real-time via SSE streaming. Includes live evaluation against ACTC ground truth.
+
+> The Volve field operated 2007–2016, but real-time drilling sensor data only covers the 2007–2009 construction phase. After 2009 the rig left and the field moved to production (different file types, no real-time WITSML streams).
 
 ![Newton Drilling Monitor](static/demo.png)
 
@@ -19,17 +21,15 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 
 ### Advanced Mode (⚙)
 
-- **Live accuracy tracking** — compares predictions against ACTC ground truth (unanimous windows only), shows F1, precision, recall, confusion matrix
-- **Manual A/B testing** — run two configs in parallel, compare F1 side-by-side, apply the winner
-- **Auto optimizer** — tests 10 configs automatically (40 windows each), ranks by F1 score, probe-based warm-up, streams from mixed drilling/not-drilling sections found server-side
-- **Config persistence** — applied configs saved to localStorage, restored on next app load
-- **Guided suggestions** — recommends config changes based on error patterns
+- **Live Evaluation** — compares predictions against ACTC ground truth (unanimous windows only), shows accuracy, F1, precision, recall, confusion matrix, and per-window pass/fail log
 
-## Current Model Limitation
+## Tuning the Config
 
-The streaming API currently uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). Testing with the auto optimizer across 10 configurations (window sizes 32/64/128, metrics euclidean/manhattan/cosine, K=3/5/7, weights uniform/distance) showed **F1: 0% across all configs** — the generic encoder cannot distinguish drilling from not-drilling sensor patterns, even with balanced 50/50 ground truth data.
+Hyperparameter search lives in a separate tool: [archetypeai/newton-streaming-optimizer](https://github.com/archetypeai/newton-streaming-optimizer) brute-forces a grid of window sizes / KNN params against the streaming API and outputs a ready-to-use config JSON. Drop the winning values into `DEFAULT_CONFIG` in `src/lib/server/newton.js` to apply them here.
 
-The batch processing pipeline uses `omega_1_3_surface` (domain-specific encoder trained on surface drilling data) and achieves **67% accuracy**. Once `omega_1_3_surface` is available for the streaming/lens API, classification quality should improve significantly.
+## Notes on the Streaming Encoder
+
+The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). Macro F1 around 85% is achievable with well-chosen n-shot examples and a balanced inference slice (see the streaming optimizer results). The batch pipeline's `omega_1_3_surface` (domain-specific surface drilling encoder) achieves higher accuracy but is not yet available for the streaming/lens API.
 
 ## Stack
 
@@ -87,14 +87,6 @@ Open `http://localhost:5173`, select a well, click **Start Analysis**, then pres
 5. Newton computes OmegaEncoder embeddings, runs KNN against n-shot examples, returns classification via SSE
 6. Results appear as colored bands on the rig and entries in the classification log
 
-### Auto Optimizer Flow
-
-1. Scans full well CSV server-side to find the section with best drilling/not-drilling balance
-2. Loads that specific data chunk for testing
-3. For each config: creates a session → sends probe window → waits for warm-up → streams 40 windows at 1s intervals
-4. Ranks configs by F1 score (not accuracy, to handle class imbalance)
-5. "Explore more" generates variations of the top 3 performers for a second round
-
 ## Architecture
 
 ```
@@ -105,20 +97,15 @@ src/
 │       ├── session/+server.js        # Newton lens session lifecycle (SSE progress)
 │       ├── wells/+server.js          # List wells sorted by drilling %
 │       ├── wells/data/+server.js     # Paginated well data chunks
-│       ├── wells/mixed-offset/       # Find best mixed data section
 │       ├── stream/+server.js         # Stream data windows to Newton
 │       └── sse-proxy/+server.js      # Proxy Newton SSE to browser
 ├── lib/
-│   ├── server/newton.js              # Machine State Lens API (configurable params)
+│   ├── server/newton.js              # Machine State Lens API (DEFAULT_CONFIG)
 │   ├── api/drilling.js               # Client-side fetch wrappers
 │   └── components/ui/custom/
 │       ├── rig-dashboard.svelte      # SVG rig + 10 sensor sparklines
 │       ├── classification-log.svelte # Prediction history + stats
-│       ├── accuracy-panel.svelte     # Live accuracy, confusion matrix, F1
-│       ├── ab-testing-panel.svelte   # Manual A/B config comparison
-│       ├── auto-optimizer.svelte     # Automated config search + leaderboard
-│       ├── config-editor.svelte      # Dropdown config editor per session
-│       ├── confirm-modal.svelte      # Config apply confirmation dialog
+│       ├── accuracy-panel.svelte     # Live Evaluation (accuracy, F1, confusion matrix)
 │       ├── playback-controls.svelte  # Play/pause/reset + progress
 │       └── well-selector.svelte      # Well button grid
 └── static/data/
