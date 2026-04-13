@@ -2,20 +2,34 @@
 
 Drilling state classification dashboard powered by [Newton](https://www.archetypeai.dev/) and the [Equinor Volve Data Village](https://www.equinor.com/energy/volve-data-sharing).
 
-Plays back real drilling sensor data from 14 wells in the Volve oil field (North Sea, 2007-2016) and uses Newton's Machine State Lens to classify each data window as **drilling** or **not_drilling** in real-time via SSE streaming.
+Plays back real drilling sensor data from 14 wells in the Volve oil field (North Sea, 2007-2016) and uses Newton's Machine State Lens to classify each data window as **drilling** or **not_drilling** in real-time via SSE streaming. Includes live accuracy tracking, A/B testing, and auto-optimization of KNN hyperparameters.
 
 ![Newton Drilling Monitor](static/demo.png)
 
 ## Features
 
-- **14 wells** from the Volve North Sea oil field — select any well to explore its sensor data
-- **Sensor chart** — 5 drilling channels (ROP, RPM, Pressure, Weight on Bit, Hookload) with playback
-- **Playback controls** — play, pause, reset with progress bar
-- **Machine State classification** — Newton classifies each 25-sample window as drilling or not_drilling
-- **Classification bands** — color-coded overlay on the sensor chart (cyan = drilling, orange = not drilling)
+- **14 wells** from the Volve North Sea oil field, sorted by drilling activity percentage
+- **Rig instrument panel** — SVG drilling rig with 10 live sensor sparklines (9 channels + ACTC ground truth)
+- **Playback controls** — play, pause, reset with progress bar, human-friendly timestamps
+- **Machine State classification** — Newton classifies each 64-sample window as drilling or not_drilling
 - **Classification log** — scrolling list of predictions with drilling/not-drilling counts
-- **N-shot learning** — 500 labeled examples per class uploaded to Newton for KNN classification
+- **N-shot learning** — 2,000 labeled examples per class (from batch repo, seed 42) uploaded to Newton for KNN
 - **SSE streaming** — results arrive in real-time as windows are processed
+- **Incremental data loading** — full raw CSVs (up to 1.9M rows) loaded in 5,000-row chunks during playback
+
+### Advanced Mode (⚙)
+
+- **Live accuracy tracking** — compares predictions against ACTC ground truth (unanimous windows only), shows F1, precision, recall, confusion matrix
+- **Manual A/B testing** — run two configs in parallel, compare F1 side-by-side, apply the winner
+- **Auto optimizer** — tests 10 configs automatically (40 windows each), ranks by F1 score, probe-based warm-up, streams from mixed drilling/not-drilling sections found server-side
+- **Config persistence** — applied configs saved to localStorage, restored on next app load
+- **Guided suggestions** — recommends config changes based on error patterns
+
+## Current Model Limitation
+
+The streaming API currently uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). Testing with the auto optimizer across 10 configurations (window sizes 32/64/128, metrics euclidean/manhattan/cosine, K=3/5/7, weights uniform/distance) showed **F1: 0% across all configs** — the generic encoder cannot distinguish drilling from not-drilling sensor patterns, even with balanced 50/50 ground truth data.
+
+The batch processing pipeline uses `omega_1_3_surface` (domain-specific encoder trained on surface drilling data) and achieves **67% accuracy**. Once `omega_1_3_surface` is available for the streaming/lens API, classification quality should improve significantly.
 
 ## Stack
 
@@ -33,13 +47,15 @@ The [Equinor Volve Data Village](https://www.equinor.com/energy/volve-data-shari
 |---------|-------------|------|
 | BPOS | Block Position | m |
 | DBTM | Bit Depth | m |
+| FLWI | Flow In | L/min |
+| HDTH | Hole Depth | m |
 | HKLD | Hookload | kkgf |
 | ROP | Rate of Penetration | m/h |
 | RPM | Rotary Speed | rpm |
 | SPPA | Standpipe Pressure | kPa |
 | WOB | Weight on Bit | kkgf |
 
-**Drilling** = bit on bottom, rotating, mud flowing, hole getting deeper. **Not drilling** = tripping, circulating, shut in, etc.
+**Drilling** (ACTC 1-2) = bit on bottom, rotating, mud flowing, hole getting deeper. **Not drilling** (ACTC 3/4/8/9) = tripping, circulating, shut in, etc.
 
 ## Setup
 
@@ -64,38 +80,20 @@ Open `http://localhost:5173`, select a well, click **Start Analysis**, then pres
 
 ## How It Works
 
-1. Select a well — data loads incrementally from full raw CSVs (up to 1.9M rows)
-2. **Start Analysis** uploads n-shot CSV files (2,000 drilling + 2,000 not_drilling examples), creates a Machine State Lens session, and connects SSE
-3. Press **Play** — data plays back at accelerated speed, advancing the chart playhead
+1. Select a well — data loads incrementally from full raw CSVs (up to 1.9M rows per well)
+2. **Start Analysis** uploads n-shot CSV files (2,000 drilling + 2,000 not_drilling), creates a Machine State Lens session, and connects SSE
+3. Press **Play** — data plays back at accelerated speed, advancing the rig sparklines and playhead
 4. As the playhead passes each 64-sample window boundary, the window is streamed to Newton
-5. Newton's Machine State Lens computes OmegaEncoder embeddings, runs KNN against n-shot examples, and returns a classification via SSE
-6. Results appear as colored bands on the sensor chart and entries in the classification log
+5. Newton computes OmegaEncoder embeddings, runs KNN against n-shot examples, returns classification via SSE
+6. Results appear as colored bands on the rig and entries in the classification log
 
-## Advanced Mode
+### Auto Optimizer Flow
 
-Toggle the gear icon (⚙) in the menubar to enable advanced features:
-
-### Live Accuracy Tracking
-- Compares Newton's predictions against ACTC ground truth in real-time
-- Only evaluates unanimous windows (all rows same ACTC label) for fair comparison
-- Shows overall accuracy, rolling 20-window accuracy, confusion matrix, precision/recall
-
-### Manual A/B Testing
-- Configure two different parameter sets (A and B) with dropdowns for window size, K neighbors, metric, and weights
-- Run both sessions in parallel on the same well data
-- Side-by-side accuracy comparison with "Apply" button for the winner
-
-### Auto Optimizer
-- Automatically tries 10 config combinations (20 windows each)
-- Searches over: window size [32/64/128], K [3/5/7], metric [euclidean/manhattan/cosine], weights [uniform/distance]
-- Shows a live leaderboard sorted by accuracy
-- "Use this" button applies the best config with one click
-
-### Config Persistence
-- Applied configs are saved to `localStorage` and restored on next app load
-- The app starts with the last-used config instead of defaults
-- Accuracy panel shows "saved" indicator when using a persisted config
-- Clearing browser data resets to defaults (window=64, euclidean, uniform, k=5)
+1. Scans full well CSV server-side to find the section with best drilling/not-drilling balance
+2. Loads that specific data chunk for testing
+3. For each config: creates a session → sends probe window → waits for warm-up → streams 40 windows at 1s intervals
+4. Ranks configs by F1 score (not accuracy, to handle class imbalance)
+5. "Explore more" generates variations of the top 3 performers for a second round
 
 ## Architecture
 
@@ -104,22 +102,29 @@ src/
 ├── routes/
 │   ├── +page.svelte                  # Dashboard orchestrator
 │   └── api/
-│       ├── session/+server.js        # Newton lens session lifecycle
-│       ├── wells/+server.js          # List available wells
+│       ├── session/+server.js        # Newton lens session lifecycle (SSE progress)
+│       ├── wells/+server.js          # List wells sorted by drilling %
+│       ├── wells/data/+server.js     # Paginated well data chunks
+│       ├── wells/mixed-offset/       # Find best mixed data section
 │       ├── stream/+server.js         # Stream data windows to Newton
 │       └── sse-proxy/+server.js      # Proxy Newton SSE to browser
 ├── lib/
-│   ├── server/newton.js              # Machine State Lens API client
+│   ├── server/newton.js              # Machine State Lens API (configurable params)
 │   ├── api/drilling.js               # Client-side fetch wrappers
 │   └── components/ui/custom/
-│       ├── well-selector.svelte      # 14-well button grid
-│       ├── sensor-chart.svelte       # Multi-channel SVG chart + classification bands
+│       ├── rig-dashboard.svelte      # SVG rig + 10 sensor sparklines
 │       ├── classification-log.svelte # Prediction history + stats
-│       └── playback-controls.svelte  # Play/pause/reset + progress
+│       ├── accuracy-panel.svelte     # Live accuracy, confusion matrix, F1
+│       ├── ab-testing-panel.svelte   # Manual A/B config comparison
+│       ├── auto-optimizer.svelte     # Automated config search + leaderboard
+│       ├── config-editor.svelte      # Dropdown config editor per session
+│       ├── confirm-modal.svelte      # Config apply confirmation dialog
+│       ├── playback-controls.svelte  # Play/pause/reset + progress
+│       └── well-selector.svelte      # Well button grid
 └── static/data/
-    ├── volve_drilling.csv            # N-shot examples (drilling)
-    ├── volve_not_drilling.csv        # N-shot examples (not_drilling)
-    └── wells/                        # 14 downsampled well CSVs (5,000 rows each)
+    ├── volve_drilling.csv            # N-shot examples (2,000 drilling rows)
+    ├── volve_not_drilling.csv        # N-shot examples (2,000 not-drilling rows)
+    └── wells/                        # 14 full raw well CSVs (Git LFS)
 ```
 
 ## Newton API Pattern
@@ -131,6 +136,29 @@ This demo uses the **Machine State Lens** — the third Newton API pattern:
 | Vision (lens session + model.query) | Traffic, Wildfire | Image → classification |
 | Text reasoning (direct query) | Earthquake, Grid | Structured text → analysis |
 | **Machine State (lens session + SSE)** | **Drilling** | **Time-series → state classification** |
+
+## Newton Config
+
+```json
+{
+  "model_name": "OmegaEncoder",
+  "model_version": "OmegaEncoder::omega_embeddings_01",
+  "normalize_input": true,
+  "buffer_size": 64,
+  "csv_configs": {
+    "timestamp_column": "DATE_TIME",
+    "data_columns": ["BPOS", "DBTM", "FLWI", "HDTH", "HKLD", "ROP", "RPM", "SPPA", "WOB"],
+    "window_size": 64,
+    "step_size": 64
+  },
+  "knn_configs": {
+    "n_neighbors": 5,
+    "metric": "euclidean",
+    "weights": "uniform",
+    "algorithm": "ball_tree"
+  }
+}
+```
 
 ## Data Attribution
 
