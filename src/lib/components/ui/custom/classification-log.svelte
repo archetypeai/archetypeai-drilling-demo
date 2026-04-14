@@ -22,7 +22,7 @@
 	{...restProps}
 >
 	{#if stats.total > 0}
-		<div class="flex flex-wrap items-center gap-2 font-mono text-[10px]">
+		<div class="flex flex-wrap items-center gap-2 font-mono text-xs">
 			<span class="text-muted-foreground">
 				Windows: <span class="text-foreground">{stats.total}</span>
 			</span>
@@ -43,17 +43,17 @@
 				</p>
 			{:else}
 				{#each [...classifications].reverse() as cls, i (cls.id)}
-					<div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-1 py-0.5 font-mono text-[10px]">
+					<div class="grid grid-cols-[auto_1fr_auto] items-center gap-2 px-1 py-0.5 font-mono text-xs">
 						<span class={cn(
-							'w-20 rounded-xs px-1.5 py-0.5 text-center text-[9px]',
+							'w-20 rounded-xs px-1.5 py-0.5 text-center text-[11px]',
 							cls.label === 'DRILLING'
 								? 'bg-[#22d3ee]/20 text-[#22d3ee]'
 								: 'bg-[#f97316]/20 text-[#f97316]'
 						)}>
 							{cls.label === 'DRILLING' ? 'DRILLING' : 'NOT_DRILL'}
 						</span>
-						<span class="text-muted-foreground text-[9px]">{cls.windowStart}–{cls.windowEnd}</span>
-						<span class="text-muted-foreground text-[9px]">#{classifications.length - i}</span>
+						<span class="text-muted-foreground text-[11px]">{cls.windowStart}–{cls.windowEnd}</span>
+						<span class="text-muted-foreground text-[11px]">#{classifications.length - i}</span>
 					</div>
 				{/each}
 			{/if}
