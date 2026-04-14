@@ -33,6 +33,7 @@
 	let selectedWell = $state(null);
 	let wellData = $state([]);
 	let wellTotal = $state(0);
+	let dataStartOffset = $state(0);
 	let loadedOffset = $state(0);
 	let loadingChunk = $state(false);
 	let playheadIndex = $state(0);
@@ -74,9 +75,9 @@
 		// Auto-seek to the section with the best drilling/not-drilling mix
 		// so the demo starts with both classes visible, not a long single-class stretch.
 		const mixed = await fetchMixedOffset(well.id, WINDOW_SIZE);
-		const startOffset = mixed.offset || 0;
+		dataStartOffset = mixed.offset || 0;
 
-		await loadNextChunk(well.id, startOffset);
+		await loadNextChunk(well.id, dataStartOffset);
 		playheadIndex = 0;
 	}
 
@@ -341,8 +342,8 @@
 	<div class="border-border flex items-center gap-4 border-b px-4 py-2">
 		<PlaybackControls
 			{playing}
-			current={playheadIndex}
-			total={wellData.length || wellTotal}
+			current={dataStartOffset + playheadIndex}
+			total={wellTotal}
 			wellName={selectedWell?.shortName ?? ''}
 			timestamp={wellData[playheadIndex]?.DATE_TIME ?? null}
 			onplay={handlePlay}
