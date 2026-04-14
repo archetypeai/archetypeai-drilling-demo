@@ -19,9 +19,13 @@ async function scanWells() {
 		const match = name.match(/F-[\w]+$/);
 		const shortName = match ? match[0] : name;
 
-		// Count ACTC codes to compute drilling %
+		// Count ACTC codes to compute drilling %, not-drilling %, and class balance
 		let total = 0;
 		let drilling = 0;
+		let notDrilling = 0;
+
+		const ACTC_DRILLING = new Set(['1', '2']);
+		const ACTC_NOT_DRILLING = new Set(['3', '4', '8', '9']);
 
 		await new Promise((res, rej) => {
 			const rl = createInterface({
@@ -40,20 +44,32 @@ async function scanWells() {
 				total++;
 				if (actcIdx >= 0) {
 					const code = line.split(',')[actcIdx]?.trim();
-					if (code === '1' || code === '2') drilling++;
+					if (ACTC_DRILLING.has(code)) drilling++;
+					else if (ACTC_NOT_DRILLING.has(code)) notDrilling++;
 				}
 			});
 			rl.on('close', res);
 			rl.on('error', rej);
 		});
 
+		const labeled = drilling + notDrilling;
 		const drillingPct = total > 0 ? ((drilling / total) * 100).toFixed(1) : '0';
+		// Class balance: 0 = single-class, 0.5 = perfectly balanced.
+		// Wells with better balance produce more meaningful Live Evaluation
+		// results and higher F1 in the demo.
+		const balance = labeled > 0 ? Math.min(drilling, notDrilling) / labeled : 0;
 
-		wells.push({ id: f, name, shortName, total, drilling, drillingPct: parseFloat(drillingPct) });
+		wells.push({
+			id: f, name, shortName, total, drilling, notDrilling,
+			drillingPct: parseFloat(drillingPct),
+			balance: parseFloat(balance.toFixed(3))
+		});
 	}
 
-	// Sort by drilling % descending
-	wells.sort((a, b) => b.drillingPct - a.drillingPct);
+	// Sort by class balance descending — wells with both drilling and
+	// not-drilling activity show the most interesting Newton results.
+	// Single-class wells (F-15B, F-15A, etc.) sort to the end.
+	wells.sort((a, b) => b.balance - a.balance);
 	cachedWells = wells;
 	return wells;
 }
