@@ -38,6 +38,12 @@ export async function startSession(onStep, config = {}) {
 	});
 }
 
+export async function fetchMixedOffset(wellFile, windowSize = 128, numWindows = 100) {
+	const res = await fetch(`/api/wells/mixed-offset?well=${encodeURIComponent(wellFile)}&windowSize=${windowSize}&numWindows=${numWindows}`);
+	if (!res.ok) return { offset: 0, mix: 0 };
+	return res.json();
+}
+
 export async function streamWindowToNewton(sessionId, rows) {
 	const res = await fetch('/api/stream', {
 		method: 'POST',

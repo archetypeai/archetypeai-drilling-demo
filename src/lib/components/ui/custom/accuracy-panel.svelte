@@ -66,16 +66,18 @@
 		const precision = tp + fp > 0 ? ((tp / (tp + fp)) * 100).toFixed(1) : '--';
 		const recall = tp + fn > 0 ? ((tp / (tp + fn)) * 100).toFixed(1) : '--';
 
-		return { correct, incorrect, total, accuracy, skipped, tp, fp, fn, tn, precision, recall };
+		// Macro F1: average of per-class F1 scores
+		const drillP = tp + fp > 0 ? tp / (tp + fp) : 0;
+		const drillR = tp + fn > 0 ? tp / (tp + fn) : 0;
+		const drillF1 = drillP + drillR > 0 ? 2 * drillP * drillR / (drillP + drillR) : 0;
+		const notP = tn + fn > 0 ? tn / (tn + fn) : 0;
+		const notR = tn + fp > 0 ? tn / (tn + fp) : 0;
+		const notF1 = notP + notR > 0 ? 2 * notP * notR / (notP + notR) : 0;
+		const f1 = total > 0 ? (((drillF1 + notF1) / 2) * 100).toFixed(1) : '--';
+
+		return { correct, incorrect, total, accuracy, skipped, tp, fp, fn, tn, precision, recall, f1 };
 	});
 
-	// Rolling accuracy (last 20 windows)
-	let rollingAccuracy = $derived.by(() => {
-		const recent = evaluated.filter((e) => !e.skipped).slice(-20);
-		if (recent.length === 0) return '--';
-		const correct = recent.filter((e) => e.correct).length;
-		return ((correct / recent.length) * 100).toFixed(1);
-	});
 </script>
 
 <BackgroundCard
@@ -88,19 +90,19 @@
 		Only counts unanimous windows (all rows same ACTC label). Mixed/transition windows are skipped.
 	</p>
 
-	<!-- Overall accuracy gauge -->
+	<!-- F1 + accuracy gauge -->
 	<div class="flex flex-wrap items-center gap-3">
+		<div class="flex flex-col items-center">
+			<span class="text-foreground font-mono text-xl font-medium">
+				{stats.f1}{stats.f1 !== '--' ? '%' : ''}
+			</span>
+			<span class="text-muted-foreground text-[9px]">F1</span>
+		</div>
 		<div class="flex flex-col items-center">
 			<span class="text-foreground font-mono text-xl font-medium">
 				{stats.accuracy}{stats.accuracy !== '--' ? '%' : ''}
 			</span>
-			<span class="text-muted-foreground text-[9px]">Overall</span>
-		</div>
-		<div class="flex flex-col items-center">
-			<span class="text-foreground font-mono text-xl font-medium">
-				{rollingAccuracy}{rollingAccuracy !== '--' ? '%' : ''}
-			</span>
-			<span class="text-muted-foreground text-[9px]">Last 20w</span>
+			<span class="text-muted-foreground text-[9px]">Accuracy</span>
 		</div>
 		<div class="flex flex-col gap-0.5">
 			<div class="flex gap-2 font-mono text-[9px]">

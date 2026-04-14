@@ -11,7 +11,7 @@
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import SpinnerIcon from '@lucide/svelte/icons/loader';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import { fetchWells, fetchWellChunk, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
+	import { fetchWells, fetchWellChunk, fetchMixedOffset, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
 
 	// Mirrors src/lib/server/newton.js DEFAULT_CONFIG; used for display in Live Evaluation.
 	const DEFAULT_CONFIG = {
@@ -71,7 +71,13 @@
 		wellTotal = 0;
 		if (playInterval) clearInterval(playInterval);
 
-		await loadNextChunk(well.id, 0);
+		// Auto-seek to the section with the best drilling/not-drilling mix
+		// so the demo starts with both classes visible, not a long single-class stretch.
+		const mixed = await fetchMixedOffset(well.id, WINDOW_SIZE);
+		const startOffset = mixed.offset || 0;
+
+		await loadNextChunk(well.id, startOffset);
+		playheadIndex = 0;
 	}
 
 	async function loadNextChunk(wellFile, offset) {
