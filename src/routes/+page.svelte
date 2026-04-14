@@ -96,8 +96,10 @@
 	}
 
 	function maybeLoadMore() {
-		// Load next chunk when playhead is within 1000 rows of loaded data
-		if (selectedWell && loadedOffset < wellTotal && playheadIndex > loadedOffset - 1000) {
+		// Load next chunk when playhead is within 1000 rows of the end of loaded data.
+		// Compare against wellData.length (local) not loadedOffset (absolute file position)
+		// because playheadIndex is a local index into wellData.
+		if (selectedWell && loadedOffset < wellTotal && playheadIndex > wellData.length - 1000) {
 			loadNextChunk(selectedWell.id, loadedOffset);
 		}
 	}
@@ -340,7 +342,7 @@
 		<PlaybackControls
 			{playing}
 			current={playheadIndex}
-			total={wellTotal}
+			total={wellData.length || wellTotal}
 			wellName={selectedWell?.shortName ?? ''}
 			timestamp={wellData[playheadIndex]?.DATE_TIME ?? null}
 			onplay={handlePlay}
