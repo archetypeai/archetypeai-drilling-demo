@@ -86,8 +86,8 @@
 	class={cn('flex flex-col gap-3', className)}
 	{...restProps}
 >
-	<p class="text-muted-foreground text-[9px]">
-		Only counts unanimous windows (all rows same ACTC label). Mixed/transition windows are skipped.
+	<p class="text-muted-foreground text-[10px]">
+		Unanimous windows only. Mixed/transition windows are skipped.
 	</p>
 
 	<!-- F1 + accuracy gauge -->
@@ -96,23 +96,23 @@
 			<span class="text-foreground font-mono text-xl font-medium">
 				{stats.f1}{stats.f1 !== '--' ? '%' : ''}
 			</span>
-			<span class="text-muted-foreground text-[9px]">F1</span>
+			<span class="text-muted-foreground text-[10px]">F1</span>
 		</div>
 		<div class="flex flex-col items-center">
 			<span class="text-foreground font-mono text-xl font-medium">
 				{stats.accuracy}{stats.accuracy !== '--' ? '%' : ''}
 			</span>
-			<span class="text-muted-foreground text-[9px]">Accuracy</span>
+			<span class="text-muted-foreground text-[10px]">Accuracy</span>
 		</div>
 		<div class="flex flex-col gap-0.5">
-			<div class="flex gap-2 font-mono text-[9px]">
+			<div class="flex gap-2 font-mono text-xs">
 				<span class="text-atai-good">{stats.correct} correct</span>
 				<span class="text-atai-critical">{stats.incorrect} wrong</span>
 				{#if stats.skipped > 0}
 					<span class="text-muted-foreground">{stats.skipped} skipped</span>
 				{/if}
 			</div>
-			<div class="flex gap-2 font-mono text-[10px]">
+			<div class="flex gap-2 font-mono text-xs">
 				<span class="text-muted-foreground">Precision: {stats.precision}%</span>
 				<span class="text-muted-foreground">Recall: {stats.recall}%</span>
 			</div>
@@ -122,8 +122,8 @@
 	<!-- Confusion matrix -->
 	{#if stats.total > 0}
 		<div class="border-border rounded-xs border p-2">
-			<p class="text-muted-foreground mb-1 text-[10px]">Confusion Matrix (predicted vs actual)</p>
-			<div class="grid grid-cols-[auto_1fr_1fr] gap-1 font-mono text-[10px]">
+			<p class="text-muted-foreground mb-1 text-xs">Confusion Matrix (predicted vs actual)</p>
+			<div class="grid grid-cols-[auto_1fr_1fr] gap-1 font-mono text-xs">
 				<span></span>
 				<span class="text-muted-foreground text-center">Actual Drill</span>
 				<span class="text-muted-foreground text-center">Actual Not</span>
@@ -139,8 +139,8 @@
 
 	<!-- Current config -->
 	<div class="border-border rounded-xs border p-2">
-		<p class="text-muted-foreground mb-1 text-[10px]">Current Config</p>
-		<div class="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-[10px]">
+		<p class="text-muted-foreground mb-1 text-xs">Current Config</p>
+		<div class="grid grid-cols-2 gap-x-4 gap-y-0.5 font-mono text-xs">
 			<span class="text-muted-foreground">Window size</span>
 			<span class="text-foreground">{config.windowSize ?? 25}</span>
 			<span class="text-muted-foreground">Step size</span>
@@ -162,7 +162,7 @@
 	<ScrollArea class="min-h-0 flex-1">
 		<div class="flex flex-col gap-0.5 pr-3">
 			{#each [...evaluated].reverse().slice(0, 50) as e (e.id)}
-				<div class="grid grid-cols-[auto_auto_auto_auto] items-center gap-1 px-1 py-0.5 font-mono text-[8px]">
+				<div class="grid grid-cols-[auto_auto_auto_auto] items-center gap-1.5 px-1 py-0.5 font-mono text-xs">
 					{#if e.skipped}
 						<span class="text-muted-foreground">?</span>
 					{:else if e.correct}
