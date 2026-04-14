@@ -10,7 +10,7 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 
 ## Features
 
-- **14 wells** from the Volve North Sea oil field, sorted by drilling activity percentage
+- **14 wells** from the Volve North Sea oil field, sorted by class balance (wells with both drilling and not-drilling activity first)
 - **Rig instrument panel** — SVG drilling rig with 10 live sensor sparklines (9 channels + ACTC ground truth)
 - **Playback controls** — play, pause, reset with progress bar, human-friendly timestamps
 - **Machine State classification** — Newton classifies each 128-sample window as drilling or not_drilling
@@ -18,6 +18,7 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 - **N-shot learning** — 2,000 labeled examples per class (from batch repo, seed 42) uploaded to Newton for KNN
 - **SSE streaming** — results arrive in real-time as windows are processed
 - **Incremental data loading** — full raw CSVs (up to 1.9M rows) loaded in 5,000-row chunks during playback
+- **Auto-seek** — automatically starts playback at the section with the best drilling/not-drilling balance (scored by unanimous windows, not raw rows)
 
 ### Advanced Mode (⚙)
 
@@ -31,9 +32,18 @@ The current default (`window=128, k=3, euclidean, uniform`) is the optimizer's t
 
 ## Notes on the Streaming Encoder
 
-The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). On the optimizer's balanced 200K-row drilling slice, the tuned w128 config reaches **macro F1 = 100%** (drilling P=100% / R=100%, not_drilling P=100% / R=100% across 99 unanimous test windows).
+The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). On the optimizer's balanced 200K-row drilling slice, the tuned w128 config reaches **macro F1 = 100%** (99 unanimous test windows). On full-file evaluation with `classify.py` across the same slice: **F1 = 94.6%** (1,465 unanimous windows).
 
-> **Caveat on the headline number:** that's an in-distribution evaluation (n-shot examples and test slice both come from the same Volve dataset) on the most-balanced section the optimizer could find, scored only on unanimous windows. Realistically expect **85-95% per-well in the demo**, varying by well: wells with substantive drilling activity (F-12, F-14, F-4, F-5, F-9) will score in the 90s; wells with little or no drilling will fail trivially because there's nothing to classify *as* drilling.
+**Per-well numbers in the live demo are lower.** Observed during testing:
+
+| Well | F1 | Notes |
+|---|---:|---|
+| F-15S | ~94% | Best — large, balanced well |
+| F-1 | ~63% | Conservative drilling predictions (high precision, low recall) |
+| F-5 (NA) | ~57% | |
+| F-7 | ~45% | High transition activity → many skipped windows |
+
+The gap between optimizer numbers (94–100%) and per-well reality (45–94%) is due to distribution shift: the generic n-shot examples were extracted from one region of the dataset and don't equally represent the operational patterns of every well.
 
 The batch pipeline's `omega_1_3_surface` (domain-specific surface drilling encoder) achieves higher accuracy on the broader drilling distribution but is not yet available for the streaming/lens API.
 
@@ -101,8 +111,9 @@ src/
 │   ├── +page.svelte                  # Dashboard orchestrator
 │   └── api/
 │       ├── session/+server.js        # Newton lens session lifecycle (SSE progress)
-│       ├── wells/+server.js          # List wells sorted by drilling %
+│       ├── wells/+server.js          # List wells sorted by class balance
 │       ├── wells/data/+server.js     # Paginated well data chunks
+│       ├── wells/mixed-offset/       # Find best mixed section (auto-seek)
 │       ├── stream/+server.js         # Stream data windows to Newton
 │       └── sse-proxy/+server.js      # Proxy Newton SSE to browser
 ├── lib/
@@ -155,6 +166,36 @@ Optimized via [newton-streaming-optimizer](https://github.com/archetypeai/newton
   }
 }
 ```
+
+## Known Limitations
+
+### Accuracy varies widely by well
+
+The optimizer reports F1 = 94–100% on its curated evaluation slice. Real per-well performance ranges from **45% to 94% F1** depending on the well's operational profile, transition frequency, and similarity to the generic n-shot examples. This is not a bug — it's the inherent limitation of few-shot classification with a generic encoder.
+
+### No "I don't know" answer
+
+KNN always picks the nearest class, even when the input is far from any n-shot example. Wells with unusual operations (sidtracks, casing, completions) that don't resemble either the "drilling" or "not drilling" n-shots will be force-classified into one, often incorrectly. A confidence threshold or abstention mechanism would help but is not available in the current Newton lens API.
+
+### Single-class wells show misleading metrics
+
+5 of the 14 Volve wells are effectively single-class (>98% drilling): F-9A, F-10, F-15, F-15A, F-15B. These are sorted to the end of the well selector since there's nothing meaningful to evaluate. F1 may show 0% on these wells even though the model is technically correct most of the time — there simply aren't enough minority-class windows to score.
+
+### Transition-heavy sections produce many skipped windows
+
+At `window_size=128`, windows that straddle a drilling↔not-drilling transition contain mixed ACTC codes and are excluded from evaluation. Wells like F-7 with frequent state changes can have 30%+ skipped windows. The auto-seek minimizes this by starting at a section with the most *unanimous* (single-class) windows, but some skipping is inevitable.
+
+### Per-well n-shots don't help
+
+We tested extracting n-shot examples from each well's own data (per-well prep). Counterintuitively, this performed **worse** than the generic multi-well n-shots (F-7: 40% F1 per-well vs 80% F1 generic). The generic examples are more diverse and capture a broader range of drilling/not-drilling signatures. The right lever for improving accuracy is a better encoder (e.g., `omega_1_3_surface`), not per-well reference data.
+
+### 4× slower classification update rate at w128
+
+Each 128-sample window takes ~640ms to accumulate during playback vs ~160ms at w32. The dashboard feels less "live" but each prediction is more reliable. A future improvement could use overlapping windows (`window=128, step=32`) for 4× more frequent predictions without losing context, but this wasn't tested with the optimizer.
+
+### Session settle time
+
+Each Newton session requires ~60 seconds after creation for the KNN index to finish building from the n-shot files. During this time the dashboard shows "Connecting...". This is a platform-level constraint — the session reports READY before the index is fully loaded.
 
 ## Data Attribution
 
