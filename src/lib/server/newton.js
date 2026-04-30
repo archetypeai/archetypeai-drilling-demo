@@ -1,4 +1,4 @@
-import { ATAI_API_KEY, ATAI_API_ENDPOINT } from '$env/static/private';
+import { ATAI_API_KEY, ATAI_API_ENDPOINT, ATAI_MODEL_VERSION } from '$env/static/private';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
@@ -133,7 +133,7 @@ export async function createDrillingSessionWithProgress(onStep, config = {}) {
 			],
 			model_parameters: {
 				model_name: 'OmegaEncoder',
-				model_version: 'OmegaEncoder::omega_embeddings_01',
+				model_version: ATAI_MODEL_VERSION,
 				normalize_input: true,
 				buffer_size: cfg.windowSize,
 				input_n_shot: {

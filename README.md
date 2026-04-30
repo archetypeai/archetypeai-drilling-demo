@@ -45,7 +45,7 @@ The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series 
 
 The gap between optimizer numbers (94–100%) and per-well reality (45–94%) is due to distribution shift: the generic n-shot examples were extracted from one region of the dataset and don't equally represent the operational patterns of every well.
 
-The batch pipeline's `omega_1_3_surface` (domain-specific surface drilling encoder) achieves higher accuracy on the broader drilling distribution but is not yet available for the streaming/lens API.
+A domain-specific surface drilling encoder is now exposed via the streaming/lens API as `OmegaEncoder::omega_embeddings_surface_01` (staging only as of 2026-04-30). It's a drop-in replacement for `omega_embeddings_01` with the same lens config — set `ATAI_MODEL_VERSION` in `.env` to switch.
 
 ## Stack
 
@@ -84,7 +84,14 @@ Create a `.env` file:
 ```
 ATAI_API_KEY=your_api_key_here
 ATAI_API_ENDPOINT=https://api.u1.archetypeai.app/
+
+# Model version. Available options:
+#   OmegaEncoder::omega_embeddings_01          (prod + staging)
+#   OmegaEncoder::omega_embeddings_surface_01  (staging only as of 2026-04-30)
+ATAI_MODEL_VERSION=OmegaEncoder::omega_embeddings_01
 ```
+
+`ATAI_MODEL_VERSION` is read at build time, so restart the dev server after changing it.
 
 ## Development
 
