@@ -32,7 +32,9 @@ The current default (`window=128, k=3, euclidean, uniform`) is the optimizer's t
 
 ## Notes on the Streaming Encoder
 
-The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series encoder). On the optimizer's balanced 200K-row drilling slice, the tuned w128 config reaches **macro F1 = 100%** (99 unanimous test windows). On full-file evaluation with `classify.py` across the same slice: **F1 = 94.6%** (1,465 unanimous windows).
+The current default is `OmegaEncoder::omega_embeddings_1_4` (generic time-series encoder, the current prod default per the [`newton-models`](https://github.com/archetypeai/archetypeai-agent-skills/blob/main/skills/newton-models/SKILL.md) skill). The previously-documented `OmegaEncoder::omega_embeddings_01` is still exposed and was the default when this demo's accuracy numbers below were measured.
+
+**The accuracy figures in this README were measured against `omega_embeddings_01`.** Re-run the optimizer (`scripts/optimize.py`) and `classify.py` against your data after switching encoders — the two encoders produce materially different embedding vectors for the same input (same `[N × 768]` shape, different values), and KNN distances over them will differ. On the optimizer's balanced 200K-row drilling slice, the tuned w128 config with `_01` reached **macro F1 = 100%** (99 unanimous test windows). On full-file evaluation with `classify.py` across the same slice: **F1 = 94.6%** (1,465 unanimous windows). Comparable numbers for `_1_4` have not yet been measured here.
 
 **Per-well numbers in the live demo are lower.** Observed during testing:
 
@@ -45,7 +47,7 @@ The streaming API uses `OmegaEncoder::omega_embeddings_01` (generic time-series 
 
 The gap between optimizer numbers (94–100%) and per-well reality (45–94%) is due to distribution shift: the generic n-shot examples were extracted from one region of the dataset and don't equally represent the operational patterns of every well.
 
-A domain-specific surface drilling encoder is now exposed via the streaming/lens API as `OmegaEncoder::omega_embeddings_surface_01` (staging only as of 2026-04-30). It's a drop-in replacement for `omega_embeddings_01` with the same lens config — set `ATAI_MODEL_VERSION` in `.env` to switch.
+A domain-specific surface drilling encoder is now exposed via the streaming/lens API as `OmegaEncoder::omega_embeddings_surface_01` (staging only as of 2026-04-30). It's a drop-in replacement for the generic encoders with the same lens config — set `ATAI_MODEL_VERSION` in `.env` to switch.
 
 ## Stack
 
@@ -86,9 +88,10 @@ ATAI_API_KEY=your_api_key_here
 ATAI_API_ENDPOINT=https://api.u1.archetypeai.app/
 
 # Model version. Available options:
-#   OmegaEncoder::omega_embeddings_01          (prod + staging)
-#   OmegaEncoder::omega_embeddings_surface_01  (staging only as of 2026-04-30)
-ATAI_MODEL_VERSION=OmegaEncoder::omega_embeddings_01
+#   OmegaEncoder::omega_embeddings_1_4         (prod + staging, current default)
+#   OmegaEncoder::omega_embeddings_01          (prod + staging, previous default)
+#   OmegaEncoder::omega_embeddings_surface_01  (staging only as of 2026-04-30, domain-specific)
+ATAI_MODEL_VERSION=OmegaEncoder::omega_embeddings_1_4
 ```
 
 `ATAI_MODEL_VERSION` is read at build time, so restart the dev server after changing it.
@@ -155,7 +158,7 @@ Optimized via [newton-streaming-optimizer](https://github.com/archetypeai/newton
 ```json
 {
   "model_name": "OmegaEncoder",
-  "model_version": "OmegaEncoder::omega_embeddings_01",
+  "model_version": "OmegaEncoder::omega_embeddings_1_4",
   "normalize_input": true,
   "buffer_size": 128,
   "csv_configs": {
