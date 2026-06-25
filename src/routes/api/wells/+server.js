@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import { readdirSync, createReadStream } from 'fs';
 import { resolve } from 'path';
 import { createInterface } from 'readline';
+import { REFERENCE_WELLS } from '$lib/reference-wells.js';
 
 const DATA_DIR = resolve('static/data/wells');
 
@@ -11,7 +12,11 @@ let cachedWells = null;
 async function scanWells() {
 	if (cachedWells) return cachedWells;
 
-	const files = readdirSync(DATA_DIR).filter((f) => f.endsWith('.csv'));
+	// Exclude the held-out reference wells — they build the KNN library, so
+	// classifying them would be leakage. Every selectable well is unseen.
+	const files = readdirSync(DATA_DIR).filter(
+		(f) => f.endsWith('.csv') && !REFERENCE_WELLS.includes(f)
+	);
 	const wells = [];
 
 	for (const f of files) {
@@ -60,7 +65,12 @@ async function scanWells() {
 		const balance = labeled > 0 ? Math.min(drilling, notDrilling) / labeled : 0;
 
 		wells.push({
-			id: f, name, shortName, total, drilling, notDrilling,
+			id: f,
+			name,
+			shortName,
+			total,
+			drilling,
+			notDrilling,
 			drillingPct: parseFloat(drillingPct),
 			balance: parseFloat(balance.toFixed(3))
 		});

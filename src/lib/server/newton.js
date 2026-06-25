@@ -20,11 +20,16 @@ function apiUrl(path) {
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// Global per-channel StandardScaler (data/scaler.json), loaded lazily.
+// Global per-channel robust scaler (data/scaler.json), loaded lazily.
 // Pre-normalizing every window with these fixed stats — and passing
 // normalize_input=false to Omega — preserves cross-window amplitude signal
 // that per-window normalization would erase. See scripts/build-scaler.js.
+// Scaled values are clipped to ±SCALE_CLIP so sensor-glitch sentinels in the
+// raw well data (e.g. SPPA spikes to ~1e31) can't dominate the embedding. The
+// library was built with the same clip, so live and reference stay comparable.
 // ──────────────────────────────────────────────────────────────────────
+
+const SCALE_CLIP = 10;
 
 let SCALER = null;
 let SCALER_ERROR = null;
@@ -50,7 +55,10 @@ function applyScaler(channelFirstWindow, columns) {
 		const s = SCALER.std[col] ?? 1;
 		const src = channelFirstWindow[c];
 		const dst = new Array(src.length);
-		for (let i = 0; i < src.length; i++) dst[i] = (src[i] - m) / s;
+		for (let i = 0; i < src.length; i++) {
+			const z = (src[i] - m) / s;
+			dst[i] = z > SCALE_CLIP ? SCALE_CLIP : z < -SCALE_CLIP ? -SCALE_CLIP : z;
+		}
 		out[c] = dst;
 	}
 	return out;
