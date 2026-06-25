@@ -21,8 +21,12 @@ async function scanWells() {
 
 	for (const f of files) {
 		const name = f.replace('.csv', '').replace(/\$47\$/g, '');
-		const match = name.match(/F-[\w]+$/);
+		// Allow an optional trailing token so "…F-9 A" reads "F-9 A", not the full name.
+		const match = name.match(/F-[\w]+(?: [\w]+)?$/);
 		const shortName = match ? match[0] : name;
+		// Operator prefix (everything before "-15_…"), Norway- stripped — used to
+		// disambiguate wells that share a short name (there are two F-5 exports).
+		const operator = name.replace(/-15_.*$/, '').replace(/^Norway-/, '');
 
 		// Count ACTC codes to compute drilling %, not-drilling %, and class balance
 		let total = 0;
@@ -68,12 +72,21 @@ async function scanWells() {
 			id: f,
 			name,
 			shortName,
+			operator,
 			total,
 			drilling,
 			notDrilling,
 			drillingPct: parseFloat(drillingPct),
 			balance: parseFloat(balance.toFixed(3))
 		});
+	}
+
+	// Disambiguate wells that share a short name (two distinct F-5 exports) by
+	// tagging each with its operator, e.g. "F-5 (NA-NA)" vs "F-5 (StatoilHydro)".
+	const counts = {};
+	for (const w of wells) counts[w.shortName] = (counts[w.shortName] || 0) + 1;
+	for (const w of wells) {
+		if (counts[w.shortName] > 1 && w.operator) w.shortName = `${w.shortName} (${w.operator})`;
 	}
 
 	// Sort by class balance descending — wells with both drilling and
