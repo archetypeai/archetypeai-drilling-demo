@@ -1,6 +1,6 @@
 # Newton Drilling Monitor
 
-Drilling state classification dashboard powered by [Newton](https://www.archetypeai.dev/) and the [Equinor Volve Data Village](https://www.equinor.com/energy/volve-data-sharing).
+Drilling state classification dashboard powered by [Newton](https://www.archetypeai.io/) and the [Equinor Volve Data Village](https://www.equinor.com/energy/volve-data-sharing).
 
 Plays back real drilling sensor data from 14 wells in the Volve oil field (North Sea, 2007–2009 drilling phase) and uses Newton's **Direct Query API** to classify each data window as **drilling** or **not_drilling**: every window is embedded per-channel by the Omega encoder (one stateless `/query` call per sensor) and scored by a **local KNN** against an n-shot reference library — no lens, no session, no SSE. Includes live evaluation against ACTC ground truth.
 
