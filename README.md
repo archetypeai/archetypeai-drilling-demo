@@ -24,32 +24,32 @@ Plays back real drilling sensor data from 14 wells in the Volve oil field (North
 
 - **Live Evaluation** — compares predictions against ACTC ground truth (unanimous windows only), shows accuracy, F1, precision, recall, confusion matrix, and per-window pass/fail log
 
-## Tuning the Config
-
-Hyperparameter search lives in a separate tool: [archetypeai/newton-streaming-optimizer](https://github.com/archetypeai/newton-streaming-optimizer) brute-forces a grid of window sizes / KNN params and outputs a ready-to-use config. Drop the winning `windowSize` / `stepSize` / `nNeighbors` into `DEFAULT_CONFIG` in `src/lib/server/newton.js` (and rebuild the library if the window changed) to apply them here.
-
-The current default (`window=128, k=3, euclidean`) is the optimizer's top-ranked config on the bundled drilling slice. F1 climbed monotonically with window size: w32=85.4% → w64=97.1% → w128=100%. Re-run the optimizer against your own data if you want a different sensor set or balance.
-
 ## Notes on the Encoder
 
 The classifier embeds with `OmegaEncoder::omega_embeddings_1_4` (generic time-series encoder, the current prod default per the [`atai-newton-omega-model`](https://github.com/archetypeai/agent-skills/tree/main/skills/atai-newton-omega-model) skill). Each sensor channel is sent as its own `/query` call with `normalize_input: false`; every window is pre-normalized with a fixed global scaler (`data/scaler.json`) so cross-window amplitude is preserved rather than erased by per-window normalization. The per-channel 768-d embeddings are concatenated into the joint feature the KNN compares.
 
 The encoder is hardcoded to `omega_embeddings_1_4`. To try a different encoder, change `OMEGA_MODEL` in `src/lib/server/newton.js` **and** in `scripts/build-knn-library.js`, then rebuild the library — the library embeddings and the live query path must use the same encoder, since different encoders produce different vectors (same `[N × 768]` shape, different values) and KNN distances over them are not comparable.
 
-**Per-well numbers in the live demo are lower.** Observed during earlier testing:
+**Per-well accuracy (held-out, prod).** Measured against prod (`omega_embeddings_1_4`) with the leakage-free library, scoring up to 15 unanimous-ACTC windows per class per well (window=128, k=3), DRILLING as the positive class:
 
-| Well | F1 | Notes |
-|---|---:|---|
-| F-15S | ~94% | Best — large, balanced well |
-| F-1 | ~63% | Conservative drilling predictions (high precision, low recall) |
-| F-5 (NA) | ~57% | |
-| F-7 | ~45% | High transition activity → many skipped windows |
+| Well | Accuracy | F1 | Eval windows |
+|---|---:|---:|---|
+| F-14 | 100% | 100% | 30 |
+| F-9 | 93% | 93% | 30 |
+| F-12 | 93% | 93% | 30 |
+| F-5 (NA-NA) | 90% | 91% | 30 |
+| F-5 (StatoilHydro) | 87% | 87% | 30 |
+| F-15S | 83% | 81% | 30 |
+| F-1 | 83% | 80% | 30 |
+| F-7 | 83% | 80% | 30 |
+| F-9 A † | 83% | 85% | 24 |
+| F-15B † | 65% | 79% | 17 |
+| F-15 † | 65% | 77% | 20 |
+| F-15A † | 38% | 55% | 29 |
 
-> ⚠️ These figures predate two changes: the move to a **leakage-free split** (references now come only from held-out F-10 + F-4, so they no longer overlap the wells being scored) and the `omega_embeddings_1_4` encoder. They are indicative of the difficulty, not current measurements — re-measure against the live demo if you need exact numbers.
+Across the **8 wells with substantive both-class activity**, held-out accuracy averages **~88%** (F1 ~88%) — and these are *genuinely unseen* wells (the references come only from held-out F-10 + F-4). That's notably better than the pre-fix figures, which were measured under data leakage and a different encoder.
 
-The gap between optimizer numbers (94–100%) and per-well reality is due to distribution shift: the reference wells don't equally represent the operational patterns of every other well. Removing the leakage makes this gap *more honest* (it previously flattered the wells that contributed reference rows), not necessarily smaller.
-
-A domain-specific surface drilling encoder, `OmegaEncoder::omega_embeddings_surface_01`, is exposed on `/query` (staging only as of 2026-04-30). It's a drop-in replacement for the generic encoder — to try it, set `OMEGA_MODEL` in `src/lib/server/newton.js` and `scripts/build-knn-library.js`, then rebuild the library so the reference embeddings and the live query path use the same encoder.
+† **Single-class wells** (>99% drilling: F-9 A, F-15, F-15A, F-15B) have only 2–14 not-drilling windows in the entire well, so a balanced sample over-weights that rare class and the metric is noisy/misleading — see [Single-class wells show misleading metrics](#single-class-wells-show-misleading-metrics). They're sorted to the end of the selector.
 
 ## Stack
 
@@ -115,9 +115,9 @@ Open `http://localhost:5173`, select a well, click **Start Analysis**, then pres
 ## How It Works
 
 1. Select a well — data loads incrementally from full raw CSVs (up to 1.9M rows per well)
-2. **Start Analysis** arms the analysis (no lens session — Direct Query is stateless) and pre-classifies the first few windows
+2. **Start Analysis** arms the analysis (no lens session — Direct Query is stateless) and classifies the first window
 3. Press **Play** — data plays back at accelerated speed, advancing the rig sparklines and playhead
-4. As the playhead passes each 128-sample window boundary, the window is POSTed to `/api/classify`
+4. The window **under the playhead** is POSTed to `/api/classify` (up to 3 in flight), so verdicts track what's on screen
 5. The server pre-normalizes the window with the global scaler, embeds each channel via Omega `/query` (`normalize_input: false`), concatenates the per-channel vectors, and runs a local KNN against `data/knn-library.json`
 6. The verdict returns synchronously and appears as colored bands on the rig and entries in the classification log
 
@@ -178,15 +178,15 @@ The window/step were tuned with [newton-streaming-optimizer](https://github.com/
 
 ### Accuracy varies widely by well
 
-The optimizer reports F1 = 94–100% on its curated evaluation slice. Real per-well performance ranges from **45% to 94% F1** depending on the well's operational profile, transition frequency, and similarity to the generic n-shot examples. This is not a bug — it's the inherent limitation of few-shot classification with a generic encoder.
+Held-out prod accuracy is **~88% across the 8 both-class wells** (see the per-well table above), but it varies with each well's operational profile, transition frequency, and similarity to the reference wells, and the single-class wells score lower on a balanced sample. This isn't a bug — it's the inherent limitation of few-shot classification with a generic encoder.
 
 ### No "I don't know" answer
 
-KNN always picks the nearest class, even when the input is far from any n-shot example. Wells with unusual operations (sidtracks, casing, completions) that don't resemble either the "drilling" or "not drilling" n-shots will be force-classified into one, often incorrectly. A confidence threshold or abstention mechanism would help but is not available in the current Newton lens API.
+KNN always picks the nearest class, even when the input is far from any n-shot example. Wells with unusual operations (sidetracks, casing, completions) that don't resemble either the "drilling" or "not drilling" references will be force-classified into one, often incorrectly. A distance threshold or abstention mechanism would help but isn't implemented here.
 
 ### Single-class wells show misleading metrics
 
-5 of the 14 Volve wells are effectively single-class (>98% drilling): F-9A, F-10, F-15, F-15A, F-15B. These are sorted to the end of the well selector since there's nothing meaningful to evaluate. F1 may show 0% on these wells even though the model is technically correct most of the time — there simply aren't enough minority-class windows to score.
+Four classifiable wells are effectively single-class (>98% drilling): F-9 A, F-15, F-15A, F-15B. They sort to the end of the selector. Their per-well numbers above are noisy because a balanced eval sample over-weights the 2–14 not-drilling windows that exist; in normal use (mostly drilling) they score much higher.
 
 ### Transition-heavy sections produce many skipped windows
 
@@ -198,15 +198,9 @@ The references come from two **held-out wells** — F-10 (drilling-rich) and F-4
 
 > Earlier versions sampled the n-shot examples (the bundled `volve_drilling.csv` / `volve_not_drilling.csv`) from across *all* wells, which leaked reference rows into the very wells being scored and flattered accuracy on the wells that contributed most. Those files were removed; the library is now built from the held-out wells only.
 
-The remaining lever for accuracy is the encoder — e.g. a domain-specific surface-drilling Omega encoder. To swap, change `OMEGA_MODEL` in both `src/lib/server/newton.js` and `scripts/build-knn-library.js`, then rebuild the library.
-
-### 4× slower classification update rate at w128
-
-Each 128-sample window takes ~640ms to accumulate during playback vs ~160ms at w32. The dashboard feels less "live" but each prediction is more reliable. A future improvement could use overlapping windows (`window=128, step=32`) for 4× more frequent predictions without losing context, but this wasn't tested with the optimizer.
-
 ### Direct Query latency
 
-Each window fans out 9 per-channel `/query` calls (bounded to 6 concurrent, with retries). On staging that's roughly 1–2 s per window, so at fast playback the classification log trails the rig slightly — the UI classifies windows one at a time (guarded so playback never fans out overlapping calls) and catches up between transitions. The n-shot library is precomputed offline, so there's no per-session warm-up wait.
+Each window fans out 9 per-channel `/query` calls (bounded to 6 concurrent, with retries) — roughly 1–3 s per window. To stay aligned with playback, the UI classifies the window **under the playhead** rather than sequentially from the start, with up to 3 windows in flight at once (`MAX_IN_FLIGHT` in `+page.svelte`). Verdicts therefore track what's on screen; at fast playback some windows between are skipped (the log is sparse but every entry is relevant). The library is precomputed offline, so there's no per-session warm-up wait.
 
 ## Data Attribution
 
