@@ -51,12 +51,18 @@
 	let advancedMode = $state(false);
 
 	let classifications = $state([]);
-	let streamCounter = $state(0);
 	let expanded = $state(null);
 
-	// Direct Query is synchronous and slower than the playback tick, so guard
-	// against overlapping /api/classify calls — classify windows one at a time.
-	let classifying = $state(false);
+	// Direct Query is slower than the playback tick, so we classify the window
+	// *under the playhead* (skipping windows we can't keep up with) rather than
+	// sequentially from the start — verdicts track what you're watching. Up to
+	// MAX_IN_FLIGHT windows run concurrently, so consecutive windows near the
+	// playhead get scored as it advances. `scheduled` dedupes; `runId` discards
+	// in-flight results after a reset/stop.
+	const MAX_IN_FLIGHT = 3;
+	let inFlight = 0;
+	let scheduled = new Set();
+	let runId = 0;
 
 	async function loadWells() {
 		try {
@@ -71,7 +77,7 @@
 		selectedWell = well;
 		playheadIndex = 0;
 		classifications = [];
-		streamCounter = 0;
+		resetClassifier();
 		playing = false;
 		loadedOffset = 0;
 		wellData = [];
@@ -111,13 +117,19 @@
 		}
 	}
 
-	async function handleStart() {
+	function resetClassifier() {
+		runId++; // invalidate any in-flight results
+		inFlight = 0;
+		scheduled = new Set();
+	}
+
+	function handleStart() {
 		// No lens session — Direct Query is stateless. "Start" just arms the
-		// analysis: reset state and pre-classify a few windows so the first
-		// verdicts are ready before Play.
+		// analysis: reset state and classify the first window so there's a verdict
+		// before Play.
 		if (sessionId) {
 			classifications = [];
-			streamCounter = 0;
+			resetClassifier();
 			return;
 		}
 
@@ -125,55 +137,55 @@
 		sessionId = 'direct-query';
 		setupStep = '';
 		classifications = [];
-		streamCounter = 0;
-
-		// Pre-classify first few windows so results are ready before Play.
-		preClassifyWindows(3);
+		resetClassifier();
+		maybeClassify(); // seed the window at the current playhead
 	}
 
-	async function preClassifyWindows(count) {
-		let waited = 0;
-		while (wellData.length < WINDOW_SIZE && waited < 10000) {
-			await new Promise((r) => setTimeout(r, 200));
-			waited += 200;
-		}
-		if (!sessionId || wellData.length < WINDOW_SIZE) return;
-
-		for (let i = 0; i < count; i++) {
-			await classifyNextWindow();
-		}
+	// Insert a verdict keeping classifications ordered by window position, so the
+	// log reads in order and `currentState` (last entry) is the one nearest the
+	// playhead even when results complete out of order.
+	function addClassification(entry) {
+		const arr = [...classifications];
+		let i = arr.length;
+		while (i > 0 && arr[i - 1].windowStart > entry.windowStart) i--;
+		arr.splice(i, 0, entry);
+		classifications = arr;
 	}
 
-	// Classify the next window via Direct Query and append the verdict.
-	// Serialized via `classifying` so playback never fans out concurrent calls.
-	async function classifyNextWindow() {
-		if (!sessionId || !wellData.length || classifying) return;
-
-		const start = streamCounter * STEP_SIZE;
+	// Classify the window under the playhead (option a) with a small concurrency
+	// pool (option b). Skips windows already scored/in-flight and any the pool is
+	// too busy to take — coverage stays dense near the playhead, with gaps when
+	// playback outruns the classifier.
+	function maybeClassify() {
+		if (!sessionId || !wellData.length || inFlight >= MAX_IN_FLIGHT) return;
+		const target = Math.floor(playheadIndex / STEP_SIZE);
+		if (scheduled.has(target)) return;
+		const start = target * STEP_SIZE;
 		const end = start + WINDOW_SIZE;
-		if (end > wellData.length) return; // wait until a full window is loaded
+		if (end > wellData.length) return; // window not fully loaded yet
 
-		const window = wellData.slice(start, end);
-		classifying = true;
-		try {
-			const result = await classifyWindow(window, DEFAULT_CONFIG.nNeighbors);
-			classifications = [
-				...classifications,
-				{
+		scheduled.add(target);
+		inFlight++;
+		const myRun = runId;
+		classifyWindow(wellData.slice(start, end), DEFAULT_CONFIG.nNeighbors)
+			.then((result) => {
+				if (myRun !== runId) return; // discarded by a reset/stop
+				addClassification({
 					id: crypto.randomUUID(),
 					label: result.label,
 					votes: result.votes,
 					neighbors: result.neighbors,
 					windowStart: start,
 					windowEnd: end
-				}
-			];
-			streamCounter++;
-		} catch (err) {
-			console.error('Classify failed:', err);
-		} finally {
-			classifying = false;
-		}
+				});
+			})
+			.catch((err) => {
+				if (myRun === runId) scheduled.delete(target); // allow a retry
+				console.error('Classify failed:', err);
+			})
+			.finally(() => {
+				if (myRun === runId) inFlight--;
+			});
 	}
 
 	function handlePlay() {
@@ -186,13 +198,7 @@
 			}
 
 			maybeLoadMore();
-
-			if (sessionId) {
-				const nextWindowStart = streamCounter * STEP_SIZE;
-				if (playheadIndex >= nextWindowStart) {
-					classifyNextWindow();
-				}
-			}
+			if (sessionId) maybeClassify();
 
 			if (playheadIndex >= wellData.length - 1 && loadedOffset >= wellTotal) {
 				playing = false;
@@ -210,12 +216,13 @@
 		playing = false;
 		if (playInterval) clearInterval(playInterval);
 		playheadIndex = 0;
-		streamCounter = 0;
 		classifications = [];
+		resetClassifier();
 	}
 
 	function handleStop() {
 		handlePause();
+		resetClassifier();
 		sessionId = null;
 		sessionStatus = 'idle';
 	}
