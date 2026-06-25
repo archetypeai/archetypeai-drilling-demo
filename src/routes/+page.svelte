@@ -11,7 +11,12 @@
 	import MinimizeIcon from '@lucide/svelte/icons/minimize-2';
 	import SpinnerIcon from '@lucide/svelte/icons/loader';
 	import SettingsIcon from '@lucide/svelte/icons/settings';
-	import { fetchWells, fetchWellChunk, fetchMixedOffset, startSession, streamWindowToNewton, endSession } from '$lib/api/drilling.js';
+	import {
+		fetchWells,
+		fetchWellChunk,
+		fetchMixedOffset,
+		classifyWindow
+	} from '$lib/api/drilling.js';
 
 	// Mirrors src/lib/server/newton.js DEFAULT_CONFIG; used for display in Live Evaluation.
 	const DEFAULT_CONFIG = {
@@ -41,7 +46,6 @@
 	let playInterval = $state(null);
 
 	let sessionId = $state(null);
-	let sseUrl = $state(null);
 	let sessionStatus = $state('idle');
 	let setupStep = $state('');
 	let advancedMode = $state(false);
@@ -50,7 +54,9 @@
 	let streamCounter = $state(0);
 	let expanded = $state(null);
 
-	let sseSource = $state(null);
+	// Direct Query is synchronous and slower than the playback tick, so guard
+	// against overlapping /api/classify calls — classify windows one at a time.
+	let classifying = $state(false);
 
 	async function loadWells() {
 		try {
@@ -106,98 +112,26 @@
 	}
 
 	async function handleStart() {
-		// Reuse existing session if available
+		// No lens session — Direct Query is stateless. "Start" just arms the
+		// analysis: reset state and pre-classify a few windows so the first
+		// verdicts are ready before Play.
 		if (sessionId) {
 			classifications = [];
 			streamCounter = 0;
 			return;
 		}
 
-		sessionStatus = 'connecting';
-		setupStep = 'Starting...';
+		sessionStatus = 'active';
+		sessionId = 'direct-query';
+		setupStep = '';
+		classifications = [];
+		streamCounter = 0;
 
-		try {
-			const result = await startSession((step) => {
-				setupStep = step;
-			});
-			sessionId = result.sessionId;
-			sseUrl = result.sseUrl;
-			sessionStatus = 'active';
-			setupStep = '';
-
-			startSSE();
-
-			// Pre-stream first few windows so results are ready before Play
-			preStreamWindows(5);
-		} catch (err) {
-			console.error('Session failed:', err);
-			sessionStatus = 'error';
-			setupStep = '';
-		}
+		// Pre-classify first few windows so results are ready before Play.
+		preClassifyWindows(3);
 	}
 
-	function parseSSELabel(event) {
-		try {
-			const parsed = JSON.parse(event.data);
-			if (parsed.type === 'inference.result') {
-				const raw = parsed.event_data?.response;
-				if (typeof raw === 'string') return raw;
-				if (Array.isArray(raw)) return raw[0];
-				if (raw && typeof raw === 'object') return raw.class_name || raw.label || raw.prediction || JSON.stringify(raw);
-			}
-		} catch {
-			// ignore parse errors
-		}
-		return null;
-	}
-
-	function connectSSE(url, onLabel) {
-		const es = new EventSource(url);
-		let reconnectAttempts = 0;
-
-		es.onmessage = (event) => {
-			reconnectAttempts = 0;
-			const label = parseSSELabel(event);
-			if (label) onLabel(String(label));
-		};
-
-		es.onerror = () => {
-			reconnectAttempts++;
-			if (reconnectAttempts > 5) {
-				console.warn('SSE reconnect limit reached, closing');
-				es.close();
-				setTimeout(() => {
-					if (sessionId) {
-						console.log('Attempting SSE reconnect...');
-						const newEs = connectSSE(url, onLabel);
-						sseSource = newEs;
-					}
-				}, 3000);
-			}
-		};
-
-		return es;
-	}
-
-	function startSSE() {
-		if (!sseUrl) return;
-
-		const url = `/api/sse-proxy?url=${encodeURIComponent(sseUrl)}`;
-		sseSource = connectSSE(url, (label) => {
-			const windowIdx = classifications.length;
-			classifications = [
-				...classifications,
-				{
-					id: crypto.randomUUID(),
-					label,
-					windowStart: windowIdx * STEP_SIZE,
-					windowEnd: (windowIdx + 1) * STEP_SIZE
-				}
-			];
-		});
-	}
-
-	async function preStreamWindows(count) {
+	async function preClassifyWindows(count) {
 		let waited = 0;
 		while (wellData.length < WINDOW_SIZE && waited < 10000) {
 			await new Promise((r) => setTimeout(r, 200));
@@ -206,28 +140,39 @@
 		if (!sessionId || wellData.length < WINDOW_SIZE) return;
 
 		for (let i = 0; i < count; i++) {
-			await streamNextWindow();
+			await classifyNextWindow();
 		}
 	}
 
-	async function streamNextWindow() {
-		if (!sessionId || !wellData.length) return;
+	// Classify the next window via Direct Query and append the verdict.
+	// Serialized via `classifying` so playback never fans out concurrent calls.
+	async function classifyNextWindow() {
+		if (!sessionId || !wellData.length || classifying) return;
 
 		const start = streamCounter * STEP_SIZE;
 		const end = start + WINDOW_SIZE;
-		if (start >= wellData.length) {
-			playing = false;
-			if (playInterval) clearInterval(playInterval);
-			return;
-		}
+		if (end > wellData.length) return; // wait until a full window is loaded
 
-		const window = wellData.slice(start, Math.min(end, wellData.length));
-
+		const window = wellData.slice(start, end);
+		classifying = true;
 		try {
-			await streamWindowToNewton(sessionId, window);
+			const result = await classifyWindow(window, DEFAULT_CONFIG.nNeighbors);
+			classifications = [
+				...classifications,
+				{
+					id: crypto.randomUUID(),
+					label: result.label,
+					votes: result.votes,
+					neighbors: result.neighbors,
+					windowStart: start,
+					windowEnd: end
+				}
+			];
 			streamCounter++;
 		} catch (err) {
-			console.error('Stream failed:', err);
+			console.error('Classify failed:', err);
+		} finally {
+			classifying = false;
 		}
 	}
 
@@ -245,7 +190,7 @@
 			if (sessionId) {
 				const nextWindowStart = streamCounter * STEP_SIZE;
 				if (playheadIndex >= nextWindowStart) {
-					streamNextWindow();
+					classifyNextWindow();
 				}
 			}
 
@@ -269,18 +214,9 @@
 		classifications = [];
 	}
 
-	async function handleStop() {
+	function handleStop() {
 		handlePause();
-		if (sseSource) {
-			sseSource.close();
-			sseSource = null;
-		}
-		if (sessionId) {
-			try {
-				await endSession(sessionId);
-			} catch { /* ignore */ }
-			sessionId = null;
-		}
+		sessionId = null;
 		sessionStatus = 'idle';
 	}
 
@@ -294,11 +230,13 @@
 </script>
 
 {#snippet partnerSnippet()}
-	<span class="text-muted-foreground font-mono text-sm tracking-wider uppercase">Drilling Monitor</span>
+	<span class="font-mono text-sm tracking-wider text-muted-foreground uppercase"
+		>Drilling Monitor</span
+	>
 {/snippet}
 
 <div
-	class="bg-background text-foreground grid h-screen w-screen grid-rows-[auto_auto_auto_1fr] overflow-hidden"
+	class="grid h-screen w-screen grid-rows-[auto_auto_auto_1fr] overflow-hidden bg-background text-foreground"
 >
 	<Menubar partnerLogo={partnerSnippet}>
 		<div class="flex items-center gap-3">
@@ -322,24 +260,41 @@
 			variant={advancedMode ? 'default' : 'ghost'}
 			size="icon-sm"
 			aria-label="Toggle advanced mode"
-			onclick={() => { advancedMode = !advancedMode; }}
+			onclick={() => {
+				advancedMode = !advancedMode;
+			}}
 		>
 			<SettingsIcon class="size-3.5" />
 		</Button>
 	</Menubar>
 
-	<div class="border-border flex items-center gap-6 border-b px-4 py-2">
+	<div class="flex items-center gap-6 border-b border-border px-4 py-2">
 		<WellSelector {wells} bind:selected={selectedWell} onselect={handleWellSelect} />
 		{#if !sessionId}
-			<div class="text-muted-foreground hidden items-center gap-4 text-xs lg:flex">
-				<span><span class="bg-muted text-foreground mr-1 inline-flex size-5 items-center justify-center rounded-full font-mono text-[10px]">1</span> Select a well</span>
-				<span><span class="bg-muted text-foreground mr-1 inline-flex size-5 items-center justify-center rounded-full font-mono text-[10px]">2</span> Start Analysis</span>
-				<span><span class="bg-muted text-foreground mr-1 inline-flex size-5 items-center justify-center rounded-full font-mono text-[10px]">3</span> Press Play</span>
+			<div class="hidden items-center gap-4 text-xs text-muted-foreground lg:flex">
+				<span
+					><span
+						class="mr-1 inline-flex size-5 items-center justify-center rounded-full bg-muted font-mono text-[10px] text-foreground"
+						>1</span
+					> Select a well</span
+				>
+				<span
+					><span
+						class="mr-1 inline-flex size-5 items-center justify-center rounded-full bg-muted font-mono text-[10px] text-foreground"
+						>2</span
+					> Start Analysis</span
+				>
+				<span
+					><span
+						class="mr-1 inline-flex size-5 items-center justify-center rounded-full bg-muted font-mono text-[10px] text-foreground"
+						>3</span
+					> Press Play</span
+				>
 			</div>
 		{/if}
 	</div>
 
-	<div class="border-border flex items-center gap-4 border-b px-4 py-2">
+	<div class="flex items-center gap-4 border-b border-border px-4 py-2">
 		<PlaybackControls
 			{playing}
 			current={dataStartOffset + playheadIndex}
@@ -352,15 +307,21 @@
 		/>
 	</div>
 
-	<main class={cn(
-		'grid gap-4 overflow-hidden p-4',
-		advancedMode ? 'grid-cols-[3fr_1fr_2fr] grid-rows-[minmax(0,1fr)]' : 'grid-cols-[2fr_1fr] grid-rows-[minmax(0,1fr)]'
-	)}>
+	<main
+		class={cn(
+			'grid gap-4 overflow-hidden p-4',
+			advancedMode
+				? 'grid-cols-[3fr_1fr_2fr] grid-rows-[minmax(0,1fr)]'
+				: 'grid-cols-[2fr_1fr] grid-rows-[minmax(0,1fr)]'
+		)}
+	>
 		<RigDashboard
 			rows={wellData}
 			{playheadIndex}
 			{classifications}
-			currentState={classifications.length > 0 ? classifications[classifications.length - 1].label : null}
+			currentState={classifications.length > 0
+				? classifications[classifications.length - 1].label
+				: null}
 			wellIndex={wells.findIndex((w) => w.id === selectedWell?.id)}
 			onexpand={() => toggleExpand('rig')}
 			class="max-h-full overflow-hidden"
@@ -370,11 +331,7 @@
 
 		{#if advancedMode}
 			<div class="min-h-0 overflow-y-auto">
-				<AccuracyPanel
-					{classifications}
-					rows={wellData}
-					config={DEFAULT_CONFIG}
-				/>
+				<AccuracyPanel {classifications} rows={wellData} config={DEFAULT_CONFIG} />
 			</div>
 		{/if}
 	</main>
@@ -382,9 +339,9 @@
 
 <!-- Fullscreen overlay -->
 {#if expanded}
-	<div class="bg-background fixed inset-0 z-50 flex flex-col overflow-hidden">
-		<div class="border-border flex items-center justify-between border-b px-4 py-2">
-			<span class="text-foreground font-mono text-sm uppercase tracking-wider">Drilling Rig</span>
+	<div class="fixed inset-0 z-50 flex flex-col overflow-hidden bg-background">
+		<div class="flex items-center justify-between border-b border-border px-4 py-2">
+			<span class="font-mono text-sm tracking-wider text-foreground uppercase">Drilling Rig</span>
 			<Button variant="outline" size="sm" onclick={() => (expanded = null)}>
 				<MinimizeIcon class="size-3.5" />
 				Close
@@ -395,7 +352,9 @@
 				rows={wellData}
 				{playheadIndex}
 				{classifications}
-				currentState={classifications.length > 0 ? classifications[classifications.length - 1].label : null}
+				currentState={classifications.length > 0
+					? classifications[classifications.length - 1].label
+					: null}
 				wellIndex={wells.findIndex((w) => w.id === selectedWell?.id)}
 				class="h-full"
 			/>
