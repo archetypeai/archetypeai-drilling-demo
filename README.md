@@ -202,6 +202,17 @@ The references come from two **held-out wells** — F-10 (drilling-rich) and F-4
 
 Each window fans out 9 per-channel `/query` calls (bounded to 6 concurrent, with retries) — roughly 1–3 s per window. To stay aligned with playback, the UI classifies the window **under the playhead** rather than sequentially from the start, with up to 3 windows in flight at once (`MAX_IN_FLIGHT` in `+page.svelte`). Verdicts therefore track what's on screen; at fast playback some windows between are skipped (the log is sparse but every entry is relevant). The library is precomputed offline, so there's no per-session warm-up wait.
 
+## Licence
+
+The code is under the [Apache License 2.0](LICENSE). The 14 well CSVs in
+`static/data/wells/` are Volve data from Equinor, and `data/scaler.json` and
+`data/knn-library.json` are built from them. They're under the Equinor Open Data
+Licence, not Apache 2.0: see [Data Attribution](#data-attribution).
+
+The PP Neue Montreal fonts in `static/fonts/` are copyright Pangram Pangram Foundry and
+aren't covered by the Apache licence either. The files in `.claude/` carry their own MIT
+licence ([`.claude/LICENSE`](.claude/LICENSE)).
+
 ## Data Attribution
 
 The drilling sensor data used in these examples is from the **Equinor Volve Data Village**, released under a modified CC BY 4.0 license. The data may be used for commercial and non-commercial purposes but may not be resold.
